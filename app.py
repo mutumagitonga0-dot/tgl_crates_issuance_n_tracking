@@ -1,7 +1,7 @@
 from flask import Flask, request, render_template_string
 from flask_sqlalchemy import SQLAlchemy 
 from sqlalchemy import create_engine, text
-import pyodbc
+#import pyodbc
 from datetime import datetime,timezone
 from flask import redirect, url_for, flash
 import os
