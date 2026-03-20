@@ -32,7 +32,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 #    "?driver=ODBC Driver 17 for SQL Server"
 #)
 
-external_engine = create_engine(os.environ.get('EXTERNAL_DB_URL'))
+external_engine = create_engine(os.environ.get('DATABASE_URL'))
 
 #app.config['SQLALCHEMY_DATABASE_URI'] =(
 #    "mssql+pyodbc:///?odbc_connect="
