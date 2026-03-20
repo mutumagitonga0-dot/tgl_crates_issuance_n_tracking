@@ -32,23 +32,25 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 #    "?driver=ODBC Driver 17 for SQL Server"
 #)
 
-app.config['SQLALCHEMY_DATABASE_URI'] =(
-    "mssql+pyodbc:///?odbc_connect="
-    "DRIVER={ODBC Driver 17 for SQL Server};"
-    "SERVER=TOSHIBA\\SQLEXP2014;"
-    "DATABASE=CrateTrackerDB;"
-    "UID=sa;"
-    "PWD=CMos@2019")
+external_engine = create_engine(os.environ.get('EXTERNAL_DB_URL'))
+
+#app.config['SQLALCHEMY_DATABASE_URI'] =(
+#    "mssql+pyodbc:///?odbc_connect="
+#    "DRIVER={ODBC Driver 17 for SQL Server};"
+#    "SERVER=TOSHIBA\\SQLEXP2014;"
+#    "DATABASE=CrateTrackerDB;"
+#    "UID=sa;"
+#    "PWD=CMos@2019")
 
 # External DB connection (adjust credentials)
-external_engine = create_engine(
-    "mssql+pyodbc:///?odbc_connect="
-    "DRIVER={ODBC Driver 17 for SQL Server};"
-    "SERVER=tundagreen.aceplasticsafrica.com;"
-    "DATABASE=ACELIVEDATA;"
-    "UID=Usertunda;"
-    "PWD=Tunda@2024"
-)
+#external_engine = create_engine(
+#    "mssql+pyodbc:///?odbc_connect="
+#    "DRIVER={ODBC Driver 17 for SQL Server};"
+#    "SERVER=tundagreen.aceplasticsafrica.com;"
+#    "DATABASE=ACELIVEDATA;"
+#    "UID=Usertunda;"
+#    "PWD=Tunda@2024"
+#)
 
 
 #app.config['SQLALCHEMY_DATABASE_URI'] = (
