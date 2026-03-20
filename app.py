@@ -4,22 +4,24 @@ from sqlalchemy import create_engine, text
 import pyodbc
 from datetime import datetime,timezone
 from flask import redirect, url_for, flash
+import os
 
 
-
-conn = pyodbc.connect(
-    "DRIVER={ODBC Driver 17 for SQL Server};"
-    "SERVER=TOSHIBA\\SQLEXP2014;"
-    "DATABASE=CrateTrackerDB;"
-    "UID=sa;"
-    "PWD=CMos@2019"
-)
-print("Connected!")
+#conn = pyodbc.connect(
+#    "DRIVER={ODBC Driver 17 for SQL Server};"
+#    "SERVER=TOSHIBA\\SQLEXP2014;"
+#    "DATABASE=CrateTrackerDB;"
+#    "UID=sa;"
+#    "PWD=CMos@2019"
+#)
+#print("Connected!")
 
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key"  # required for flash/session
 
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///crates.db'
 
@@ -52,8 +54,6 @@ external_engine = create_engine(
 #app.config['SQLALCHEMY_DATABASE_URI'] = (
 #  "mssql+pyodbc://sa:CMos@2019@TOSHIBA\\SQLEXP2014/CrateTrackerDB"
 #  "?driver=ODBC+Driver+17+for+SQL+Server")
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 print("SQLAlchemy URI:", app.config['SQLALCHEMY_DATABASE_URI'])
 
