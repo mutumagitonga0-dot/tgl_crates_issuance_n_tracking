@@ -21,7 +21,44 @@ app = Flask(__name__)
 app.secret_key = "super_secret_key"  # required for flash/session
 
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+# Prefer DATABASE_URL if set (Render/Postgres)
+db_url = os.environ.get("DATABASE_URL")
+
+if db_url:
+    # Render/Postgres connection
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+else:
+    # Local fallback (SQL Server via pyodbc)
+    app.config['SQLALCHEMY_DATABASE_URI'] = (
+        "mssql+pyodbc:///?odbc_connect="
+        "DRIVER={ODBC Driver 17 for SQL Server};"
+        "SERVER=TOSHIBA\\SQLEXP2014;"
+        "DATABASE=CrateTrackerDB;"
+        "UID=sa;"
+        "PWD=CMos@2019"
+    )
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# Optional external DB connection (use env var EXTERNAL_DB_URL on Render)
+external_db_url = os.environ.get("EXTERNAL_DB_URL")
+if external_db_url:
+    external_engine = create_engine(external_db_url)
+else:
+    # Local fallback external SQL Server
+    external_engine = create_engine(
+        "mssql+pyodbc:///?odbc_connect="
+        "DRIVER={ODBC Driver 17 for SQL Server};"
+        "SERVER=tundagreen.aceplasticsafrica.com;"
+        "DATABASE=ACELIVEDATA;"
+        "UID=Usertunda;"
+        "PWD=Tunda@2024"
+    )
+
+
+
+#app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 
 #app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///crates.db'
 
@@ -32,7 +69,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 #    "?driver=ODBC Driver 17 for SQL Server"
 #)
 
-external_engine = create_engine(os.environ.get('DATABASE_URL'))
+#external_engine = create_engine(os.environ.get('DATABASE_URL'))
 
 #app.config['SQLALCHEMY_DATABASE_URI'] =(
 #    "mssql+pyodbc:///?odbc_connect="
@@ -57,16 +94,16 @@ external_engine = create_engine(os.environ.get('DATABASE_URL'))
 #  "mssql+pyodbc://sa:CMos@2019@TOSHIBA\\SQLEXP2014/CrateTrackerDB"
 #  "?driver=ODBC+Driver+17+for+SQL+Server")
 
-print("SQLAlchemy URI:", app.config['SQLALCHEMY_DATABASE_URI'])
+#print("SQLAlchemy URI:", app.config['SQLALCHEMY_DATABASE_URI'])
 
 #app.config['SQLALCHEMY_DATABASE_URI'] = (
 #    "mssql+pyodbc://sa:CMos@2019@TOSHIBA\\SQLEXP2014/CrateTrackerDB"
 #    "?driver=ODBC Driver 17 for SQL Server"
 #)
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+#app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+#db = SQLAlchemy(app)
 
 # --- Models ---
 class Outlet(db.Model):
