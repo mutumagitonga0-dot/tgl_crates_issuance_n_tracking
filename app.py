@@ -148,7 +148,7 @@ def home():
 
     #db.session.commit()
 
-    #outlets = Outlet.query.all()
+    outlets = Outlet.query.all()
     rows = ""
 
     #outlts=retrieve_outlets()
@@ -209,8 +209,8 @@ def home():
     #warehouse_total = db.session.query(db.func.sum(Warehouse.total_crates)).scalar() or 0
     #warehouse = Warehouse.query.first()  # adjust if multiple warehouses
 
-    warehouse_total=0
-    #warehouse_total= recent_wrhse_crates_stocktake_count()
+   
+    warehouse_total= recent_wrhse_crates_stocktake_count()
 
 
 
@@ -1074,9 +1074,24 @@ def manage_users():
     """
     return render_template_string(layout, content=manage_users_form)
 
+app = Flask(__name__)
+db = SQLAlchemy(app)
+
+# Secret token for init route (set in Render Environment tab)
+INIT_SECRET = os.environ.get("INIT_SECRET", "changeme")
+
+@app.route("/init-db")
+def init_db():
+    token = request.args.get("token")
+    if token != INIT_SECRET:
+        return "Unauthorized", 403
+
+    with app.app_context():
+        db.create_all()
+    return "Tables created successfully!"
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all() # creates tables if they don't exist
-    port = int(os.environ.get("PORT", 10000))  # Render sets PORT    
+    # Only run the app, don’t auto-create tables here
+    port = int(os.environ.get("PORT", 10000))  # Render sets PORT
     app.run(host="0.0.0.0", port=port, debug=True)
+
