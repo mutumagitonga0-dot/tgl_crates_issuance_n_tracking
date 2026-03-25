@@ -156,7 +156,7 @@ def home():
     #outlets = [id for id, _ in outlts]
     
     #print("DEBUG: outlets =",  outlets)
-    outlets = Outlet.query.all()
+    #outlets = Outlet.query.all()
     #for o in outlets:
   
     #dispatched = db.session.query(db.func.sum(Dispatch.crates_sent)).filter_by(outlet_id=o.id).scalar() or 0
