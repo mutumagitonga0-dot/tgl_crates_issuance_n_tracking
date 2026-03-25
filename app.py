@@ -209,7 +209,8 @@ def home():
     #warehouse_total = db.session.query(db.func.sum(Warehouse.total_crates)).scalar() or 0
     #warehouse = Warehouse.query.first()  # adjust if multiple warehouses
 
-    warehouse_total= recent_wrhse_crates_stocktake_count()
+    warehouse_total=0
+    #warehouse_total= recent_wrhse_crates_stocktake_count()
 
 
 
