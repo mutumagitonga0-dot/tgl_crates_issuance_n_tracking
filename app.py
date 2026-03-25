@@ -16,7 +16,6 @@ db_url = os.environ.get(
     "postgresql+psycopg2://postgres:postgres123@localhost:5432/CrateTrackerDB"
 )
 
-
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 db = SQLAlchemy(app)
 
