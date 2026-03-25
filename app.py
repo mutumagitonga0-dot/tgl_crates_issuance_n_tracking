@@ -10,21 +10,15 @@ import uuid
 app = Flask(__name__)
 app.secret_key = "super_secret_key"  # required for flash/session
 
+# Render provides DATABASE_URL in the environment
+db_url = os.environ.get("DATABASE_URL")
 
-#db_url = os.environ.get(
-#    "DATABASE_URL",
-#    "postgresql+psycopg2://postgres:postgres123@localhost:5432/CrateTrackerDB"
-#)
+# Ensure it's in the correct format for SQLAlchemy
+if db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-
-#app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-#import logging
-#logging.basicConfig(level=logging.INFO)
-#logging.info(f"Connecting to DB: {db_url}")
-
 db = SQLAlchemy(app)
 
 
