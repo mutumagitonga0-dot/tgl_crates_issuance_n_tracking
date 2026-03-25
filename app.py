@@ -25,48 +25,10 @@ db_url = os.environ.get(
     "DATABASE_URL",
     "postgresql+psycopg2://postgres:postgres123@localhost:5432/CrateTrackerDB"
 )
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+#app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 db = SQLAlchemy(app)
-
-
-# for local running
-  # Prefer DATABASE_URL if set (Render/Postgres)
-#db_url = os.environ.get("DATABASE_URL")
-
-#if db_url:
-    # Render/Postgres connection
-#    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-#else:
-    # Local fallback (SQL Server via pyodbc)
-#    app.config['SQLALCHEMY_DATABASE_URI'] = (
-#        "mssql+pyodbc:///?odbc_connect="
-#        "DRIVER={ODBC Driver 17 for SQL Server};"
-#        "SERVER=TOSHIBA\\SQLEXP2014;"
-#        "DATABASE=CrateTrackerDB;"
-#        "UID=sa;"
-#        "PWD=CMos@2019"
-#    )
-
-# Optional external DB connection (use env var EXTERNAL_DB_URL on Render)
-#external_db_url = os.environ.get("EXTERNAL_DB_URL")
-#if external_db_url:
-#    external_engine = create_engine(external_db_url)
-#else:
-    # Local fallback external SQL Server
-#    external_engine = create_engine(
-#        "mssql+pyodbc:///?odbc_connect="
-#        "DRIVER={ODBC Driver 17 for SQL Server};"
-#        "SERVER=tundagreen.aceplasticsafrica.com;"
-#        "DATABASE=ACELIVEDATA;"
-#        "UID=Usertunda;"
-#        "PWD=Tunda@2024"
-#    )
-
-# Finalize SQLAlchemy setup
-#app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-#db = SQLAlchemy(app)
 
 
 # --- Models ---
