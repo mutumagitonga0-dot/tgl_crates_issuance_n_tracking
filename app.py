@@ -10,22 +10,37 @@ import uuid
 app = Flask(__name__)
 app.secret_key = "super_secret_key"  # required for flash/session
 
-# Render provides DATABASE_URL in the environment
+# Secret token for init route (set in Render Environment tab)
+INIT_SECRET = os.environ.get("INIT_SECRET", "changeme")
+
+# Get DB URL from environment
 db_url = os.environ.get("DATABASE_URL")
 
-db_url = os.environ.get("DATABASE_URL")
+# Fallback for local dev
 if not db_url:
-    # fallback for local dev
     db_url = "sqlite:///local.db"
 
+# Fix Render’s default prefix if needed
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
 
+# Apply config
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
-
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Initialize SQLAlchemy
 db = SQLAlchemy(app)
 
+# Secure one-time init route
+@app.route("/init-db")
+def init_db():
+    token = request.args.get("token")
+    if token != INIT_SECRET:
+        return "Unauthorized", 403
+
+    with app.app_context():
+        db.create_all()
+    return "Tables created successfully!"
 
 # --- Models ---
 class Outlet(db.Model):
@@ -879,7 +894,6 @@ def validate_staff_selection(field_name="staff_name"):
     # Valid → continue
     return None
 
-
 #@app.route('/warehouse/<int:warehouse_id>/stocktake', methods=['POST'])
 @app.route('/warehouse/<int:Whrsh_Outlets_id>/stocktake', methods=['POST']) #Whrsh_Outlets_id
 def warehouse_stocktake(Whrsh_Outlets_id):
@@ -1079,24 +1093,7 @@ def manage_users():
     """
     return render_template_string(layout, content=manage_users_form)
 
-app = Flask(__name__)
-db = SQLAlchemy(app)
-
-# Secret token for init route (set in Render Environment tab)
-INIT_SECRET = os.environ.get("INIT_SECRET", "changeme")
-
-@app.route("/init-db")
-def init_db():
-    token = request.args.get("token")
-    if token != INIT_SECRET:
-        return "Unauthorized", 403
-
-    with app.app_context():
-        db.create_all()
-    return "Tables created successfully!"
 
 if __name__ == "__main__":
-    # Only run the app, don’t auto-create tables here
     port = int(os.environ.get("PORT", 10000))  # Render sets PORT
     app.run(host="0.0.0.0", port=port, debug=True)
-
