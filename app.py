@@ -13,11 +13,16 @@ app.secret_key = "super_secret_key"  # required for flash/session
 # Render provides DATABASE_URL in the environment
 db_url = os.environ.get("DATABASE_URL")
 
-# Ensure it's in the correct format for SQLAlchemy
-if db_url and db_url.startswith("postgres://"):
+db_url = os.environ.get("DATABASE_URL")
+if not db_url:
+    # fallback for local dev
+    db_url = "sqlite:///local.db"
+
+if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
