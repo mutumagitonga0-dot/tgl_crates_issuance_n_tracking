@@ -24,6 +24,17 @@ if not db_url:
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
 
+
+# External SQL Server connection
+external_engine = create_engine(
+    "mssql+pyodbc:///?odbc_connect="
+    "DRIVER={ODBC Driver 17 for SQL Server};"
+    "SERVER=tundagreen.aceplasticsafrica.com;"
+    "DATABASE=ACELIVEDATA;"
+    "UID=Usertunda;"
+    "PWD=Tunda@2024"
+)
+
 # Apply config
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -298,7 +309,41 @@ def home():
     content = shortcuts + summary_table
     return render_template_string(layout, content=content)
 
+
 def retrieve_outlets():
+    with external_engine.connect() as conn:
+        result = conn.execute(text(
+            "SELECT [BranchName] FROM [Tunda Green Limited$Dimension2$69b6b001-139b-4a64-a385-4bc69d6bb6a5]"
+        ))
+        external_outlets = [row.BranchName for row in result]
+
+    created_outlets = []  # will hold (id, name) pairs
+
+    # Step 2: Sync Outlet table
+    for branch_name in external_outlets:
+        existing = Outlet.query.filter_by(name=branch_name).first()
+        if not existing:
+          last_outlet = Outlet.query.order_by(Outlet.outlet_id.desc()).first()
+          next_outlet_id = (last_outlet.outlet_id + 1) if last_outlet else 1000
+
+          new_outlet = Outlet(
+              name=branch_name,
+              outlet_id=next_outlet_id
+          )
+          db.session.add(new_outlet)
+          db.session.flush()  # ensures new_outlet.id is available
+
+          created_outlets.append((new_outlet.outlet_id, new_outlet.name))
+    db.session.commit()
+
+    # Step 3: Populate warehouses with active outlets
+    #populate_warehouses_with_active_outlets(created_outlets) 
+
+    # Step 4: Return both names and IDs
+    return [(o.outlet_id, o.name) for o in Outlet.query.all()]
+    #return [o.name for o in Outlet.query.all()]
+
+def retrieve_outlets_manual_create():
     # Temporary hard-coded list for testing
     external_outlets = ['Katani', 'Airport', 'Mountain']
 
