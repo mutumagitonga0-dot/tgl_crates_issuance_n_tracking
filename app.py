@@ -319,6 +319,40 @@ def retrieve_outlets():
 
     created_outlets = []  # will hold (id, name) pairs
 
+    # Step 1: Add missing outlets
+    for branch_name in external_outlets:
+        existing = Outlet.query.filter_by(name=branch_name).first()
+        if not existing:
+            last_outlet = Outlet.query.order_by(Outlet.outlet_id.desc()).first()
+            next_outlet_id = (last_outlet.outlet_id + 1) if last_outlet else 1000
+
+            new_outlet = Outlet(
+                name=branch_name,
+                outlet_id=next_outlet_id
+            )
+            db.session.add(new_outlet)
+            db.session.flush()
+            created_outlets.append((new_outlet.outlet_id, new_outlet.name))
+
+    # Step 2: Delete outlets that no longer exist externally
+    for local_outlet in Outlet.query.all():
+        if local_outlet.name not in external_outlets:
+            db.session.delete(local_outlet)
+
+    db.session.commit()
+
+    # Step 3: Return synced outlets
+    return [(o.outlet_id, o.name) for o in Outlet.query.all()]
+
+def retrieve_outlets_withDuplcates():
+    with external_engine.connect() as conn:
+        result = conn.execute(text(
+            "SELECT [BranchName] FROM [Tunda Green Limited$Dimension2$69b6b001-139b-4a64-a385-4bc69d6bb6a5]"
+        ))
+        external_outlets = [row.BranchName for row in result]
+
+    created_outlets = []  # will hold (id, name) pairs
+
     # Step 2: Sync Outlet table
     for branch_name in external_outlets:
         existing = Outlet.query.filter_by(name=branch_name).first()
