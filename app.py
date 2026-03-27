@@ -27,7 +27,7 @@ if db_url.startswith("postgres://"):
 
 # External SQL Server connection
 external_engine = create_engine(
-    "mssql+pyodbc:///?odbc_connect="
+    "mssql+pymssql:///?odbc_connect="
     "DRIVER={ODBC Driver 17 for SQL Server};"
     "SERVER=tundagreen.aceplasticsafrica.com;"
     "DATABASE=ACELIVEDATA;"
