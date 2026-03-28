@@ -5,6 +5,9 @@ from datetime import datetime,timezone
 from flask import redirect, url_for, flash
 import os
 import uuid
+#from flask import Flask, render_template, request, redirect, url_for, flash
+#from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
+#from werkzeug.security import check_password_hash
 
 
 app = Flask(__name__)
@@ -733,11 +736,17 @@ def dashboard():
     outlet_ids = [id for (id,) in dispatched_outlets]
 
     #outlets = retrieve_outlets()
+    #outlet_names = (
+    #db.session.query(Outlet.name)
+    #.filter(Outlet.id.in_(outlet_ids))
+    #.all()
+    #)
+
     outlet_names = (
     db.session.query(Outlet.name)
-    .filter(Outlet.id.in_(outlet_ids))
-    .all()
-)
+    .filter(Outlet.outlet_id.in_(outlet_ids))
+    .all())
+
 
     # Flatten the list of tuples
     all_outlets = [name for (name,) in outlet_names]
