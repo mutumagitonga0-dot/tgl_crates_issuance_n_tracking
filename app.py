@@ -21,7 +21,16 @@ db_url = os.environ.get("DATABASE_URL")
 
 # Fallback for local dev
 if not db_url:
-    db_url = "sqlite:///local.db"
+  #db_url = "sqlite:///local.db"
+  # Use SQL Server locally
+  db_url = (
+      "mssql+pyodbc:///?odbc_connect="
+      "DRIVER={ODBC Driver 17 for SQL Server};"
+      "SERVER=TOSHIBA\\SQLEXP2014;"
+      "DATABASE=CrateTrackerDB;"
+      "UID=sa;"
+      "PWD=CMos@2019"
+  )
 
 # Fix Render’s default prefix if needed
 if db_url.startswith("postgres://"):
@@ -48,13 +57,13 @@ db = SQLAlchemy(app)
 # Secure one-time init route
 @app.route("/init-db")
 def init_db():
-    token = request.args.get("token")
-    if token != INIT_SECRET:
-        return "Unauthorized", 403
+  token = request.args.get("token")
+  if token != INIT_SECRET:
+      return "Unauthorized", 403
 
-    with app.app_context():
-        db.create_all()
-    return "Tables created successfully!"
+  with app.app_context():
+      db.create_all()
+  return "Tables created successfully!"
 
 # --- Models ---
 class Outlet(db.Model):
@@ -936,7 +945,27 @@ def dashboard():
       </div>
     </div>
 
-    <h3>Outlet Summary</h3>
+    <div class="row mb-3 align-items-center">
+    <!-- Left column: heading -->
+    <div class="col text-start">
+      <h3 class="mb-0">Outlet Summary</h3>
+    </div>
+
+    <!-- Center column: button -->
+    <div class="col text-center">
+      <button class="btn btn-primary" 
+        style="background-color:#00008B; border-color:#00008B;" 
+        data-bs-toggle="modal" 
+        data-bs-target="#stocktakeModal">
+        Perform End Day
+      </button>
+    </div>
+
+    <!-- Right column: empty (optional) -->
+    <div class="col"></div>
+    </div>
+
+    <!--h3>Outlet Summary</h3-->
     <table class="table table-bordered">
       <thead><tr><th>Outlet</th><th>Dispatched</th><th>Collected</th><th>Variance</th></tr></thead>
       <tbody>{rows}</tbody>
