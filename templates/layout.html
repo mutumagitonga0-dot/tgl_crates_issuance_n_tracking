@@ -70,7 +70,6 @@
   user-select: none;           /* prevents text selection */
 }
 
-
   /* Freeze table header row */
 /*.table thead th {
 /*    position: sticky;
@@ -81,6 +80,11 @@
 
 </style>
 
+<script>
+  document.getElementById("print-btn").addEventListener("click", function() {
+    window.print();
+  });
+</script>
 
   <footer class="bg-light text-center text-muted py-3 mt-4 border-top">
     <small>&copy; 2026 Crate Tracker | Designed for operational excellence</small>

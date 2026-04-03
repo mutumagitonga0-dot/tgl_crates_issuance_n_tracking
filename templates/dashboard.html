@@ -23,7 +23,7 @@
 <table class="table table-bordered">
 
   <table class="table table-bordered">
-    <thead>
+    <thead class="table-dark">
       <tr>
         <th>Periodical Warehouse</th>
         <th>Last Stocktake</th>
@@ -42,7 +42,7 @@
   <div class="col d-flex justify-content-between align-items-center">
     <h4 class="mb-3">Daily Crates Reconciliation</h4>
      <button id="toggle-history" class="btn btn-outline-primary btn-sm">
-      View History
+      View Reconciliation History
     </button>
   </div>
 
@@ -91,6 +91,10 @@
   	<button id="load-more" class="btn btn-outline-primary btn-sm">
     	Load More
   	</button>
+        <button id="print-btn" class="btn btn-outline-primary btn-sm">
+          Print
+       </button>
+        
      </h5>
       <table class="table table-sm table-striped text-center align-middle mb-0">
         <tbody>
@@ -152,7 +156,7 @@
                 data-bs-target="#reconciliationPanel"
                 aria-expanded="false"
                 aria-controls="reconciliationPanel">
-          View Reconciliation
+          View Outlets Collection Trends
         </button>
       </div>
     </div>
@@ -160,17 +164,18 @@
 <!-- Collapsible Reconciliation Panel -->
 <div class="collapse mt-4" id="reconciliationPanel">
   <div class="card card-body">
-    <h4 class="mb-3">Daily Crates Reconciliation</h4>
+    <h4 class="mb-3">Daily Outlet Collections</h4>
     <table class="table table-bordered table-striped text-center align-middle mb-0">
       <thead class="table-dark">
         <tr>
-          <th>Offloading Date</th>
-          <th>Dispatched Qty</th>
-          <th>App Collection</th>
-          <th>Offloaded Qty</th>
-          <th>Offloaded by</th>
-          <th>Today's Variance</th>
-          <th>Collection Performance %</th>
+          <th>Date</th>
+	  <th>Outlet</th>
+          <th>Recurrent Balance</th>
+          <th>App Dispatched</th>
+          <th>App Collected</th>
+          <th>Variance</th>
+          <th>Variance %</th>
+          <th>Collect By</th>
         </tr>
       </thead>
       <tbody id="reconciliation-body">
