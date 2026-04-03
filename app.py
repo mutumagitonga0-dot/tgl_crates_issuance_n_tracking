@@ -1130,7 +1130,7 @@ def endday(Whrsh_Outlets_id):
     else:
         log = EndDayLog(
             warehouse_id=warehouse.id,
-            dispatched_crates=total_daily_crates_dispacthed(),
+            dispatched_crates=total_daily_crates_dispatched(),
             app_collections=app_collections,
             physical_crates=physical_crates,
             variance=variance,
@@ -1157,7 +1157,7 @@ def get_app_collections():
 def get_app_dispatches():
     # Example: calculate from EndDayLog or Warehouse
     #latest_value = db.session.query(db.func.sum(EndDayLog.app_collections)).scalar() or 0
-    latest_value =total_daily_crates_dispacthed()
+    latest_value =total_daily_crates_dispatched()
     print("DEBUG: app_dispatched =", latest_value) 
     return {"app_dispatched": latest_value}
 
