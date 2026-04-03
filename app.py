@@ -1006,8 +1006,9 @@ def dashboard():
     #else:
     #  warehouse_summary_text = "Warehouse Summary : No stocktake transactions found"
     if most_recent_stocktake:
-        last_stocktake_time = most_recent_stocktake.timestamp.strftime("%d %B %Y, %H:%M")
-        warehouse_summary_text = f'Warehouse Summary Based On : last Stocktake done on <span style="color:blue;">{last_stocktake_time}</span>'
+        #last_stocktake_time = most_recent_stocktake.timestamp.strftime("%d %B %Y, %H:%M")
+        last_stocktake_time = most_recent_stocktake.timestamp.strftime("%d %B %Y")
+        warehouse_summary_text = f'Warehouse Summary Based On : Last Stocktake : <span style="color:blue;">{last_stocktake_time}</span>'
     else:
         warehouse_summary_text = '<span style="color:red;">Warehouse Summary : No stocktake transactions found</span>'
 

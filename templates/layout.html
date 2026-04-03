@@ -42,11 +42,17 @@
   </div>
 
 <style>
-  .dashboard-title {
+.dashboard-title {
     text-align: center;
     font-weight: 900; /* extra bold */
     font-size: 2.5rem; /* larger size */
+    position: sticky;   /* freeze on scroll */
+    top: 0;             /* stick to top of viewport */
+    background-color: #f8f9fa; /* solid background so text is readable */
+    z-index: 10;        /* keep above other content */
+    padding: 10px;
   }
+
 .readonly-highlight {
   background-color: #f0f0f0;
   font-weight: bold;
@@ -63,6 +69,16 @@
   cursor: not-allowed;         /* blocked cursor */
   user-select: none;           /* prevents text selection */
 }
+
+
+  /* Freeze table header row */
+/*.table thead th {
+/*    position: sticky;
+/*    top: 0;
+/*    background-color: #fff; /* keep header visible */
+/*    z-index: 5;
+*/  }
+
 </style>
 
 
