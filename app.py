@@ -1120,11 +1120,11 @@ def endday(Whrsh_Outlets_id):
             })
 
     # Case B: Record exists but from yesterday → lock
-    elif last_log and date.today() > last_log.created_at.date():
-        return jsonify({
-            "status": "locked",
-            "message": "Cannot overwrite yesterday's End of Day. Records are locked after midnight."
-        })
+    #elif last_log and date.today() > last_log.created_at.date():
+    #    return jsonify({
+    #        "status": "locked",
+    #        "message": "Cannot overwrite yesterday's End of Day. Records are locked after midnight."
+    #    })
 
     # Case C: No record yet today → insert new
     else:
