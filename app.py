@@ -200,32 +200,37 @@ def init_db():
   return "Tables created successfully!"
 
 def push_to_github():
+   #Nb.you should be here
+   #(venv) PS C:\Users\Admin\crate-tracker\backend_for_web>
+
     # 1. Initialize Git in your project folder (only once)
-    git init
+    #git init
 
     # 2. Add your remote GitHub repository
     # Replace with your actual repo URL
     #git remote add origin https://github.com/your-username/your-repo.git
-    git remote set-url origin https://github.com/mutumagitonga0-dot/tgl_crates_issuance_n_tracking.git"
+    #my correct path
+    #git remote set-url origin https://github.com/mutumagitonga0-dot/tgl_crates_issuance_n_tracking.git"
 
     # 3. Stage all files (prepare them for commit)
-    git add .
+    #git add .
 
     # 4. Commit your changes with a message
-    git commit -m "Initial commit or update backend code"
+    #git commit -m "Initial commit or update backend code"
 
     # 5. Push to GitHub
     # First push (sets branch name and upstream)
-    git branch -M main
-    git push -u origin main
+    #git branch -M main
+    #git push -u origin main
+
 
     # Subsequent pushes (after making new changes)
-    git add .
-    git commit -m "Describe your changes here"
-    git push
+    #git add .
+    #git commit -m "Describe your changes here"
+    #git push
 
+  import subprocess
 
-import subprocess
 def connect_sqlalchemy_database_cmd():
     # Path to your psql.exe
     psql_path = r"C:\Program Files\PostgreSQL\18\bin\psql.exe"
