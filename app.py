@@ -199,6 +199,28 @@ def init_db():
       db.create_all()
   return "Tables created successfully!"
 
+def github_upload_instructions():
+    """
+    Step-by-step guide to upload your project to GitHub.
+    Run these commands in your terminal (PowerShell or bash).
+    """
+
+    steps = [
+        "1. Initialize Git (only once per project): git init",
+        "2. Add remote repository (only once): git remote add origin https://github.com/your-username/crate-tracker.git",
+        "3. Stage all files: git add .",
+        "4. Commit changes: git commit -m 'Initial commit of crate-tracker project'",
+        "5. Set branch name: git branch -M main",
+        "6. Push to GitHub: git push -u origin main",
+        "7. For future changes: git add . && git commit -m 'Describe change' && git push"
+    ]
+
+    return "\n".join(steps)
+
+@app.route("/github_instructions")
+def github_instructions():
+    return f"<pre>{github_upload_instructions()}</pre>"
+
 ## --- Routes ---
 @app.route("/")
 def home():
