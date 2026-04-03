@@ -362,7 +362,7 @@ def home():
     <div class="d-grid gap-3 mb-4">
       <a href="/dispatch" class="btn btn-success btn-lg">➕ Record Dispatch</a>
       <a href="/collect" class="btn btn-warning btn-lg">📥 Record Collection</a>
-      <a href="/dashboard" class="btn btn-primary btn-lg">📋 View All Outlets Dashboard</a>
+      <a href="/dashboard" class="btn btn-primary btn-lg">📋 Daily Outlets Performance Dashboard</a>
       <!--a href="/reconcile/1" class="btn btn-info btn-lg">📊 Reconcile Outlet 1</a-->
       <!--a href="/manage_users" class="btn btn-dark btn-lg">🏬 Manage Users</a-->
     </div>
