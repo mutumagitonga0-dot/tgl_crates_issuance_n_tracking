@@ -1,10 +1,13 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, redirect, url_for, flash, render_template, jsonify
 from flask_sqlalchemy import SQLAlchemy 
 from sqlalchemy import create_engine, text
-from datetime import datetime,timezone
-from flask import redirect, url_for, flash
+from flask_migrate import Migrate
+from datetime import datetime,timezone,date
 import os
 import uuid
+
+
+
 #from flask import Flask, render_template, request, redirect, url_for, flash
 #from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
 #from werkzeug.security import check_password_hash
@@ -53,18 +56,11 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize SQLAlchemy
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
-# Secure one-time init route
-@app.route("/init-db")
-def init_db():
-  token = request.args.get("token")
-  if token != INIT_SECRET:
-      return "Unauthorized", 403
 
-  with app.app_context():
-      db.create_all()
-  return "Tables created successfully!"
-
+# Import models AFTER db is defined
+#import models
 # --- Models ---
 class Outlet(db.Model):
     __tablename__ = 'outlet'
@@ -111,6 +107,22 @@ class WarehouseTransaction(db.Model):
 
     def __repr__(self):
         return f"<WarehouseTransaction {self.transaction_type} for Outlet {self.Wrhse_outlet_id}>"
+
+class EndDayLog(db.Model):
+    __tablename__ = "end_day_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    #warehouse_id = db.Column(db.Integer, db.ForeignKey("warehouse.id"), nullable=False)
+    warehouse_id = db.Column(db.Integer, nullable=False) 
+    dispatched_crates = db.Column(db.Integer, nullable=False)
+    app_collections = db.Column(db.Integer, nullable=False)
+    physical_crates = db.Column(db.Integer, nullable=False)
+    variance = db.Column(db.Integer, nullable=False)
+    staff_name = db.Column(db.String(100), nullable=False)
+    remarks = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=db.func.now())
+
+    #warehouse = db.relationship("Warehouse", backref="end_day_logs")
 
 # --- Layout Template with Navbar ---
 layout = """
@@ -175,9 +187,23 @@ layout = """
 # --- Reusable Home Button ---
 home_button = "<a href='/' class='btn btn-secondary mt-3'>⬅️ Return to Home</a>"
 
-# --- Routes ---
+# Secure one-time init route
+#http://127.0.0.1:10000/init-db?token=changeme #to create all tables manually
+@app.route("/init-db")
+def init_db():
+  token = request.args.get("token")
+  if token != INIT_SECRET:
+      return "Unauthorized", 403
+
+  with app.app_context():
+      db.create_all()
+  return "Tables created successfully!"
+
+## --- Routes ---
 @app.route("/")
 def home():
+    #return redirect(url_for("dashboard"))
+    #return render_template("home.html")
     # Step 1: Get distinct outlet names from Dispatch table
     #distinct_outlets = db.session.query(Dispatch.outlet_name).distinct().all()
 
@@ -278,6 +304,7 @@ def home():
           <tr>
             <th>Metric</th>
             <th>Crates</th>
+            <th>Availabilty %</th>
           </tr>
         </thead>
         <tbody>
@@ -286,7 +313,11 @@ def home():
             <td>{warehouse_total}</td>
           </tr>
           <tr class="table-success">
-            <td>Current Warehouse Balance</td>
+            <td>Rotational Current Warehouse Balance</td>
+            <td>{current_balance}</td>
+          </tr>
+          <tr class="table-success">
+            <td>Today's Warehouse Available after Day closure</td>
             <td>{current_balance}</td>
           </tr>
           <tr>
@@ -356,38 +387,6 @@ def retrieve_outlets():
     # Step 3: Return synced outlets
     return [(o.outlet_id, o.name) for o in Outlet.query.all()]
 
-def retrieve_outlets_withDuplcates():
-    with external_engine.connect() as conn:
-        result = conn.execute(text(
-            "SELECT [BranchName] FROM [Tunda Green Limited$Dimension2$69b6b001-139b-4a64-a385-4bc69d6bb6a5]"
-        ))
-        external_outlets = [row.BranchName for row in result]
-
-    created_outlets = []  # will hold (id, name) pairs
-
-    # Step 2: Sync Outlet table
-    for branch_name in external_outlets:
-        existing = Outlet.query.filter_by(name=branch_name).first()
-        if not existing:
-          last_outlet = Outlet.query.order_by(Outlet.outlet_id.desc()).first()
-          next_outlet_id = (last_outlet.outlet_id + 1) if last_outlet else 1000
-
-          new_outlet = Outlet(
-              name=branch_name,
-              outlet_id=next_outlet_id
-          )
-          db.session.add(new_outlet)
-          db.session.flush()  # ensures new_outlet.id is available
-
-          created_outlets.append((new_outlet.outlet_id, new_outlet.name))
-    db.session.commit()
-
-    # Step 3: Populate warehouses with active outlets
-    #populate_warehouses_with_active_outlets(created_outlets) 
-
-    # Step 4: Return both names and IDs
-    return [(o.outlet_id, o.name) for o in Outlet.query.all()]
-    #return [o.name for o in Outlet.query.all()]
 
 def retrieve_outlets_manual_create():
     # Temporary hard-coded list for testing
@@ -415,8 +414,6 @@ def retrieve_outlets_manual_create():
 
     # Step 3: Return both names and IDs
     return [(o.outlet_id, o.name) for o in Outlet.query.all()]
-
-
 
 
 def populate_warehouses_with_active_outlets(created_outlets):
@@ -710,9 +707,43 @@ def reconcile_outlet(outlet_name):
     """
     return render_template_string(layout, content=content)
 
+
+@app.route("/reconciliation")
+def reconciliation():
+    #not in any use
+    # Get the most recent EndDayLog entry
+    last_log = (
+        EndDayLog.query
+        .order_by(EndDayLog.created_at.desc())
+        .first()
+    )
+
+    # Wrap it in a list so the Jinja loop works
+    reconciliations = [last_log] if last_log else []
+    print("DEBUG: reconciliations =", reconciliations)
+
+    return render_template("dashboard.html", reconciliations=reconciliations)
+
+def total_daily_crates_dispacthed():
+  total_dispatched = (
+      db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+      .filter(WarehouseTransaction.transaction_type == 'dispatch')
+      .scalar()
+      ) or 0
+  return total_dispatched
+
+def total_daily_crates_collected():
+  total_collected = (
+        db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+        .filter(WarehouseTransaction.transaction_type == 'collection')
+        .scalar()
+        ) or 0  
+  return total_collected
+
 @app.route("/dashboard")
 def dashboard():
-    # ✅ Ensure at least one warehouse exists
+    # ... all your warehouse/outlet logic stays the same ...
+  # ✅ Ensure at least one warehouse exists
     warehouse = Warehouse.query.first()
     if not warehouse:
         warehouse = Warehouse(
@@ -738,6 +769,7 @@ def dashboard():
         .distinct()
         .all()
     )
+    
 
     #dispatched_outlets = db.session.query(WarehouseTransaction.warehouse_id).distinct()
     #collection_outlets = db.session.query(WarehouseTransaction.outlet_name).distinct()
@@ -803,18 +835,21 @@ def dashboard():
       color = "table-danger" if variance > 0 else "table-success"
       rows += f"<tr><td>{outlet_name}</td><td>{dispatched}</td><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
 
-    total_collected = (
-      db.session.query(db.func.sum(WarehouseTransaction.good_crates))
-      .filter(WarehouseTransaction.transaction_type == 'collection')
-      .scalar()
-      ) or 0
-
-    total_dispatched = (
-      db.session.query(db.func.sum(WarehouseTransaction.good_crates))
-      .filter(WarehouseTransaction.transaction_type == 'dispatch')
-      .scalar()
-      ) or 0
-
+    #total_collected = (
+    #  db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+    #  .filter(WarehouseTransaction.transaction_type == 'collection')
+    #  .scalar()
+    #  ) or 0
+    total_collected=total_daily_crates_collected()
+    print("DEBUG: total_collected =", total_collected)
+    #total_dispatched = (
+    #  db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+    #  .filter(WarehouseTransaction.transaction_type == 'dispatch')
+    #  .scalar()
+    #  ) or 0
+    total_dispatched= total_daily_crates_dispacthed() 
+    print("DEBUG: total_dispatched =", total_dispatched) 
+   
     # Warehouse summary calculations
     warehouse = Warehouse.query.first()  # adjust if multiple warehouses
     if warehouse:
@@ -842,11 +877,11 @@ def dashboard():
           <td>{total_collected}</td>
           <td>{variance}</td>
           <td>{available_pct:.2f}%</td>
-          <td>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#stocktakeModal">
-              Crates Stocktake
-            </button>
-          </td>
+          <!--td-->
+            <!--button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#stocktakeModal"-->
+             <!-- Crates Stocktake-->
+            <!--/button-->
+          <!--/td-->
         </tr>
         """
     else:
@@ -858,8 +893,8 @@ def dashboard():
         </tr>
         """
     
-    Users = retrieve_offline_users()
-    users_html = "".join([f'<option value="{o}">{o}</option>' for o in Users])
+    users = retrieve_offline_users()
+    users_html = "".join([f'<option value="{o}">{o}</option>' for o in users])
     
     most_recent_stocktake = (
         WarehouseTransaction.query
@@ -868,6 +903,28 @@ def dashboard():
         .first()
     )
     
+    # Get the most recent reconciliation record
+    #last_log = (
+    #    EndDayLog.query
+    #    .order_by(EndDayLog.created_at.desc())
+    #    .first()
+    #)
+    #reconciliations = [last_log] if last_log else []
+
+   #Get the most recent reconciliation record
+    last_rec = (
+        EndDayLog.query
+        .order_by(EndDayLog.created_at.desc())
+        .first()
+    )
+    #Fetch the last 20 reconciliation records
+    reconciliations = (
+    EndDayLog.query
+    .order_by(EndDayLog.created_at.desc())
+    .limit(20)
+    .all()
+    )
+
     #if most_recent_stocktake:
     #  last_stocktake_time = most_recent_stocktake.timestamp.strftime("%d %B %Y, %H:%M")
     #  warehouse_summary_text = f"Warehouse Summary : last Stocktake done on {last_stocktake_time}"
@@ -875,103 +932,167 @@ def dashboard():
     #  warehouse_summary_text = "Warehouse Summary : No stocktake transactions found"
     if most_recent_stocktake:
         last_stocktake_time = most_recent_stocktake.timestamp.strftime("%d %B %Y, %H:%M")
-        warehouse_summary_text = f'Warehouse Summary : last Stocktake done on <span style="color:blue;">{last_stocktake_time}</span>'
+        warehouse_summary_text = f'Warehouse Summary Based On : last Stocktake done on <span style="color:blue;">{last_stocktake_time}</span>'
     else:
         warehouse_summary_text = '<span style="color:red;">Warehouse Summary : No stocktake transactions found</span>'
 
 
-
-    # Merge warehouse summary on top, outlets below, plus modal form
-    content = f"""
-    <h2>
-      <a href="/" class="btn btn-secondary">Back to Home</a>
-      &nbsp;Dashboard
-    </h2>
-
-    <!--<h3>Warehouse Summary</h3>--> 
-    <h2>{ warehouse_summary_text }</h2>
-
-    <table class="table table-bordered">
-      <thead>
-        <tr>
-          <th>Warehouse</th>
-          <th>Last Stocktake</th>
-          <th>Total Available</th>
-          <th>Total Dispatched</th>
-          <th>Total Collected</th>
-          <th>Total Variance</th>
-          <th>Available %</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>{warehouse_row}</tbody>
-    </table>
-
+    # Build warehouse_row, rows, warehouse_summary_text, stocktake_modal, end_day_modal
+    # (these are the same strings you already construct inline)
+    crates_count = total_daily_crates_collected()
     
-    <!-- Stocktake Modal -->
-    <div class="modal fade" id="stocktakeModal" tabindex="-1" aria-labelledby="stocktakeModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <form method="POST" action="/warehouse/{warehouse.id if warehouse else 0}/stocktake">
-            <div class="modal-header">
-              <h5 class="modal-title" id="stocktakeModalLabel">Crates Stocktake - {warehouse.name if warehouse else ''}</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <label for="good_crates">Good Crates (usable)</label>
-              <input type="number" name="good_crates" min="0" class="form-control" value="{warehouse.good_crates if warehouse else 0}">
-
-              <label for="worn_crates" class="mt-2">Worn-out but usable Crates</label>
-              <input type="number" name="worn_crates" min="0" class="form-control" readonly value="{warehouse.worn_crates if warehouse else 0}">
-
-              <label for="disposed_crates" class="mt-2">Crates to Dispose</label>
-              <input type="number" name="disposed_crates" min="0" class="form-control" value="{warehouse.disposed_crates if warehouse else 0}">
-              
-              <label for="stocktake_by" class="mt-2">stocktake by</label>
-              <select name="staff_name" class="form-select mt-2" required>
-              <option value="" selected>-- Select Staff --</option>
-              { users_html }
-              </select>
-
-              <label for="description" class="mt-2">Notes / Description</label>
-              <textarea name="description" rows="3" class="form-control"></textarea>
-            </div>
-            <div class="modal-footer">
-              <button type="submit" class="btn btn-success">Submit Stocktake</button>
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            </div>
-          </form>
+    print("DEBUG: crates_count =", crates_count)
+    
+    return render_template(
+        "dashboard.html",
+        users_html=users_html,
+        warehouse=warehouse,   # ✅ pass warehouse into template
+        reconciliations=reconciliations,   # ✅ pass into template
+        last_rec=last_rec ,# ✅ pass into template for single daily collection
+        app_auto_collections= crates_count,
+        app_auto_dispatches=total_dispatched,
+        warehouse_row=warehouse_row,
+        rows=rows,
+        warehouse_summary_text=warehouse_summary_text,
+        end_day_modal=f"""
+        <div class="modal fade" id="endDayModal" tabindex="-1" aria-hidden="true">
+          <!-- your end of day modal HTML here -->
         </div>
-      </div>
-    </div>
+        """,
+        stocktake_modal=f"""
+        <div class="modal fade" id="stocktakeModal" tabindex="-1" aria-hidden="true">
+          <!-- your stocktake modal HTML here -->
+        </div>
+        """
+        
+    )
 
-    <div class="row mb-3 align-items-center">
-    <!-- Left column: heading -->
-    <div class="col text-start">
-      <h3 class="mb-0">Outlet Summary</h3>
-    </div>
+@app.route("/reconciliations/<int:offset>")
+def get_reconciliations(offset=0):
+    logs = (
+        EndDayLog.query
+        .order_by(EndDayLog.created_at.desc())
+        .offset(offset)
+        .limit(20)
+        .all()
+    )
 
-    <!-- Center column: button -->
-    <div class="col text-center">
-      <button class="btn btn-primary" 
-        style="background-color:#00008B; border-color:#00008B;" 
-        data-bs-toggle="modal" 
-        data-bs-target="#stocktakeModal">
-        Perform End Day
-      </button>
-    </div>
+    # Convert to JSON-friendly dicts
+    data = []
+    for rec in logs:
+        data.append({
+            "created_at": rec.created_at.strftime("%d %B %Y"),
+            "dispatched_crates": rec.dispatched_crates,
+            "app_collections": rec.app_collections,
+            "physical_crates": rec.physical_crates,
+            "staff_name": rec.staff_name,
+            "variance": rec.variance,
+            "performance": round(
+                (rec.physical_crates / (rec.app_collections if rec.app_collections > 0 else 1)) * 100, 2
+            )
+        })
+    return {"reconciliations": data}
 
-    <!-- Right column: empty (optional) -->
-    <div class="col"></div>
-    </div>
+@app.route("/warehouse/<int:Whrsh_Outlets_id>/endday", methods=["POST"])
+def endday(Whrsh_Outlets_id):
+    print("DEBUG: Entered endday route with ID =", Whrsh_Outlets_id)
+    print("DEBUG: mutuma onit")
+    warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=Whrsh_Outlets_id).first_or_404()
 
-    <!--h3>Outlet Summary</h3-->
-    <table class="table table-bordered">
-      <thead><tr><th>Outlet</th><th>Dispatched</th><th>Collected</th><th>Variance</th></tr></thead>
-      <tbody>{rows}</tbody>
-    </table>
-    """
-    return render_template_string(layout, content=content)
+    # Extract form values
+    physical_crates = int(request.form.get("physical_crates", 0))
+    app_collections = int(request.form.get("app_collections", 0))
+    remarks = request.form.get("remarks", "")
+    staff_name = request.form.get("staff_name", "Unknown")
+    variance = physical_crates - app_collections
+
+    # Get the most recent log for this warehouse
+    last_log = EndDayLog.query.filter_by(warehouse_id=warehouse.id)\
+        .order_by(EndDayLog.created_at.desc()).first()
+
+    # Case A: Record exists today
+    if last_log and last_log.created_at.date() == date.today():
+        if not request.form.get("overwrite"):
+            return jsonify({
+                "status": "exists",
+                "message": "Today's End of Day already recorded. Would you like to overwrite?",
+                "last_log": {
+                    "physical_crates": last_log.physical_crates,
+                    "app_collections": last_log.app_collections,
+                    "variance": last_log.variance,
+                    "staff_name": last_log.staff_name,
+                    "remarks": last_log.remarks
+                },
+                "new_values": {
+                    "physical_crates": physical_crates,
+                    "app_collections": app_collections,
+                    "variance": variance,
+                    "staff_name": staff_name,
+                    "remarks": remarks
+                }
+            })
+        else:
+            last_log.physical_crates = physical_crates
+            last_log.app_collections = app_collections
+            last_log.variance = variance
+            last_log.staff_name = staff_name
+            last_log.remarks = remarks
+            last_log.dispatched_crates = total_daily_crates_dispacthed()
+            db.session.commit()
+            return jsonify({
+                "status": "updated",
+                "message": f"Today's End of Day updated by {staff_name}. Variance: {variance}"
+            })
+
+    # Case B: Record exists but from yesterday → lock
+    elif last_log and last_log.created_at.date() < date.today():
+        return jsonify({
+            "status": "locked",
+            "message": "Cannot overwrite yesterday's End of Day. Records are locked after midnight."
+        })
+
+    # Case C: No record yet today → insert new
+    else:
+        log = EndDayLog(
+            warehouse_id=warehouse.id,
+            dispatched_crates=total_daily_crates_dispacthed(),
+            app_collections=app_collections,
+            physical_crates=physical_crates,
+            variance=variance,
+            staff_name=staff_name,
+            remarks=remarks
+        )
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({
+            "status": "inserted",
+            "message": f"End of Day submitted by {staff_name}. Variance: {variance}"
+        })
+    #return redirect(url_for("dashboard"))
+
+
+@app.route("/app_auto_collections")
+def get_app_collections():
+    # Example: calculate from EndDayLog or Warehouse
+    latest_value = db.session.query(db.func.sum(EndDayLog.app_collections)).scalar() or 0
+    print("DEBUG: app_collections =", latest_value) 
+    return {"app_collections": latest_value}
+
+@app.route("/app_auto_dispatches")
+def get_app_dispatches():
+    # Example: calculate from EndDayLog or Warehouse
+    #latest_value = db.session.query(db.func.sum(EndDayLog.app_collections)).scalar() or 0
+    latest_value =total_daily_crates_dispacthed()
+    print("DEBUG: app_dispatched =", latest_value) 
+    return {"app_dispatched": latest_value}
+
+
+@app.route("/warehouse/<int:warehouse_id>")
+def warehouse_detail(warehouse_id):
+  warehouse ={"id": warehouse_id, "name": "Main Warehouse", "collection_total": 10}
+  rows_html = "<tr><td>Outlet A</td><td>20</td><td>15</td><td>5</td></tr>"
+  return render_template("warehouse.html", warehouse=warehouse, rows=rows_html)
+
 
 def recent_wrhse_crates_stocktake_count():
   recent_stcktake_crate=0
@@ -1018,7 +1139,9 @@ def warehouse_stocktake(Whrsh_Outlets_id):
     #warehouse = Warehouse.query.get_or_404(warehouse_id)
     #print("DEBUG: Whrsh_Outlets_id =",Whrsh_Outlets_id)
     #warehouse_id = Warehouse.query.get_or_404(Whrsh_Outlets_id)
-    warehouse_id = Whrsh_Outlets_id
+
+    #warehouse_id = Whrsh_Outlets_id
+    warehouse_id = 1
     good_crates = int(request.form.get('good_crates', 0))
     worn_crates = int(request.form.get('worn_crates', 0))
     disposed_crates = int(request.form.get('disposed_crates', 0))
@@ -1030,10 +1153,11 @@ def warehouse_stocktake(Whrsh_Outlets_id):
     warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=warehouse_id).first()
 
     if warehouse:
-        warehsename = warehouse.name
-        print("DEBUG: warehsename =", warehsename)
+        ware_hse_name = warehouse.name
+        print("DEBUG: warehsename =", ware_hse_name)
     else:
         print("No warehouse found for outlet_id =", warehouse_id)
+        print("DEBUG: warehsename =", ware_hse_name)
 
     staff_name=request.form.get('staff_name', '')
     #warehouse.good_crates = good_crates
@@ -1061,7 +1185,7 @@ def warehouse_stocktake(Whrsh_Outlets_id):
         worn_crates=worn_crates,
         disposed_crates=disposed_crates,
         transaction_type=transaction_type,
-       notes = warehsename,
+       notes = ware_hse_name,
         staff_name=staff_name
     )
 
