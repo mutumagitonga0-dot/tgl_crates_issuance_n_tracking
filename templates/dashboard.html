@@ -401,10 +401,24 @@ document.getElementById("endDayForm").addEventListener("submit", function(e) {
             window.location.href = "/dashboard";
           }, { once: true });
         })
-        .catch(err => {
-          console.error("Error overwriting End of Day:", err);
-          showToast("Failed to overwrite record.", "bg-danger text-white");
-          confirmBtn.disabled = false; // re-enable if error
+        catch(err => {
+  console.error("Error overwriting End of Day:", err);
+
+  // Debug: inspect common error properties
+  if (err.response) {
+    console.error("Response data:", err.response.data);
+    console.error("Response status:", err.response.status);
+    console.error("Response headers:", err.response.headers);
+  } else if (err.request) {
+    console.error("No response received. Request details:", err.request);
+  } else {
+    console.error("Error message:", err.message);
+  }
+
+  showToast("Failed to overwrite record.", "bg-danger text-white");
+  confirmBtn.disabled = false; // re-enable if error
+});
+
         });
       };
 

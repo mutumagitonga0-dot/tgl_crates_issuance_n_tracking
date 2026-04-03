@@ -224,7 +224,7 @@ def push_to_github():
     #git push -u origin main
 
 
-    # Subsequent pushes (after making new changes)
+    # upload any change Subsequent pushes (after making new changes)
     #git add .
     #git commit -m "Describe your changes here"
     #git push
