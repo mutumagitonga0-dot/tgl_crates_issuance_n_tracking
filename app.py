@@ -199,23 +199,43 @@ def init_db():
       db.create_all()
   return "Tables created successfully!"
 
-def github_upload_instructions():
-    """
-    Step-by-step guide to upload your project to GitHub.
-    Run these commands in your terminal (PowerShell or bash).
-    """
+def push_to_github():
+    # 1. Initialize Git in your project folder (only once)
+    git init
 
-    steps = [
-        "1. Initialize Git (only once per project): git init",
-        "2. Add remote repository (only once): git remote add origin https://github.com/your-username/crate-tracker.git",
-        "3. Stage all files: git add .",
-        "4. Commit changes: git commit -m 'Initial commit of crate-tracker project'",
-        "5. Set branch name: git branch -M main",
-        "6. Push to GitHub: git push -u origin main",
-        "7. For future changes: git add . && git commit -m 'Describe change' && git push"
-    ]
+    # 2. Add your remote GitHub repository
+    # Replace with your actual repo URL
+    #git remote add origin https://github.com/your-username/your-repo.git
+    git remote set-url origin https://github.com/mutumagitonga0-dot/tgl_crates_issuance_n_tracking.git"
 
-    return "\n".join(steps)
+    # 3. Stage all files (prepare them for commit)
+    git add .
+
+    # 4. Commit your changes with a message
+    git commit -m "Initial commit or update backend code"
+
+    # 5. Push to GitHub
+    # First push (sets branch name and upstream)
+    git branch -M main
+    git push -u origin main
+
+    # Subsequent pushes (after making new changes)
+    git add .
+    git commit -m "Describe your changes here"
+    git push
+
+
+import subprocess
+def connect_sqlalchemy_database_cmd():
+    # Path to your psql.exe
+    psql_path = r"C:\Program Files\PostgreSQL\18\bin\psql.exe"
+    
+    # Full connection string
+    conn_str = "postgresql://tgl_crates_db_user:Vk1PPiktlT6aktTgzdCCNkQZZFfLeiX5@dpg-d6uodkchg0os73f4kql0-a.oregon-postgres.render.com/tgl_crates_db"
+    
+    # Run the command
+    subprocess.run([psql_path, conn_str])
+
 
 @app.route("/github_instructions")
 def github_instructions():
@@ -224,36 +244,8 @@ def github_instructions():
 ## --- Routes ---
 @app.route("/")
 def home():
-    #return redirect(url_for("dashboard"))
-    #return render_template("home.html")
-    # Step 1: Get distinct outlet names from Dispatch table
-    #distinct_outlets = db.session.query(Dispatch.outlet_name).distinct().all()
-
-    # Step 2: Insert them into Outlet table if not already present
-    #for (outlet_name,) in distinct_outlets:
-    #    if outlet_name:  # skip nulls
-    #        existing = Outlet.query.filter_by(name=outlet_name).first()
-    #        if not existing:
-    #            new_outlet = Outlet(name=outlet_name)
-    #            db.session.add(new_outlet)
-
-    #db.session.commit()
-
     outlets = Outlet.query.all()
     rows = ""
-
-    #outlts=retrieve_outlets()
-    #print("outlets fecthed",  outlts)
-    #outlets = [id for id, _ in outlts]
-    
-    #print("DEBUG: outlets =",  outlets)
-    #outlets = Outlet.query.all()
-    #for o in outlets:
-  
-    #dispatched = db.session.query(db.func.sum(Dispatch.crates_sent)).filter_by(outlet_id=o.id).scalar() or 0
-    #dispatched = db.session.query(db.func.sum(Dispatch.crates_sent)).filter_by(outlet_name=o.id).scalar() or 0
-    #collected = db.session.query(db.func.sum(Collection.crates_collected)).filter_by(outlet_id=o.id).scalar() or 0
-    #collected = db.session.query(db.func.sum(Collection.crates_collected)).filter_by(outlet_name=o.id).scalar() or 0
     
     # Example: total dispatched crates for a given outlet
     #dispatched = (
@@ -746,7 +738,39 @@ def reconciliation():
 
     return render_template("dashboard.html", reconciliations=reconciliations)
 
-def total_daily_crates_dispacthed():
+def get_last_end_day_date():
+    last_log = (
+        db.session.query(EndDayLog.created_at)
+        .order_by(EndDayLog.created_at.desc())
+        .first()
+    )
+    return last_log[0] if last_log else None
+
+def total_daily_crates_dispatched():
+    last_end_day = get_last_end_day_date()
+
+    query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(WarehouseTransaction.transaction_type == 'dispatch')
+
+    if last_end_day:
+        query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+    total_dispatched = query.scalar() or 0
+    return total_dispatched
+
+def total_daily_crates_collected():
+    last_end_day = get_last_end_day_date()
+
+    query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+            .filter(WarehouseTransaction.transaction_type == 'collection')
+    
+    if last_end_day:
+          query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+    total_collected = query.scalar() or 0
+    return total_collected
+
+def total_daily_crates_dispacthed_withno_timeline():
   total_dispatched = (
       db.session.query(db.func.sum(WarehouseTransaction.good_crates))
       .filter(WarehouseTransaction.transaction_type == 'dispatch')
@@ -754,7 +778,7 @@ def total_daily_crates_dispacthed():
       ) or 0
   return total_dispatched
 
-def total_daily_crates_collected():
+def total_daily_crates_collected_withno_timeline():
   total_collected = (
         db.session.query(db.func.sum(WarehouseTransaction.good_crates))
         .filter(WarehouseTransaction.transaction_type == 'collection')
@@ -836,26 +860,50 @@ def dashboard():
 
     rows = ""
     for outlet_name in all_outlets:
-      collected = (
-      db.session.query(db.func.sum(WarehouseTransaction.good_crates))
-      .filter(
-          WarehouseTransaction.notes == outlet_name,
-          WarehouseTransaction.transaction_type == 'collection'
-      )
-      .scalar()
-      ) or 0
+      """
+      Calculate collected and dispatched crates for a given outlet
+      since the last end day cutoff.
+      """
+      last_end_day = get_last_end_day_date()
+
+      collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'collection'
+        )
       
-      dispatched = (
-      db.session.query(db.func.sum(WarehouseTransaction.good_crates))
-      .filter(
-          WarehouseTransaction.notes == outlet_name,
-          WarehouseTransaction.transaction_type == 'dispatch'
-      )
-      .scalar()
-      ) or 0
+      dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'dispatch'
+        )
+
+      # Apply cutoff if it exists
+      if last_end_day:
+        collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
+        dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+      collected = collected_query.scalar() or 0
+      dispatched = dispatched_query.scalar() or 0
+      
+      # Recurrent balance: all-time (no cutoff filter)
+      recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+          .filter(
+              WarehouseTransaction.notes == outlet_name,
+              WarehouseTransaction.transaction_type == 'collection'
+          ).scalar() or 0
+
+      recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+          .filter(
+              WarehouseTransaction.notes == outlet_name,
+              WarehouseTransaction.transaction_type == 'dispatch'
+          ).scalar() or 0
+
+      recurrent_balance = recurrent_dispatched - recurrent_collected
+
       variance = dispatched - collected
       color = "table-danger" if variance > 0 else "table-success"
-      rows += f"<tr><td>{outlet_name}</td><td>{dispatched}</td><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
+      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{dispatched}</td><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
 
     #total_collected = (
     #  db.session.query(db.func.sum(WarehouseTransaction.good_crates))
@@ -869,7 +917,7 @@ def dashboard():
     #  .filter(WarehouseTransaction.transaction_type == 'dispatch')
     #  .scalar()
     #  ) or 0
-    total_dispatched= total_daily_crates_dispacthed() 
+    total_dispatched= total_daily_crates_dispatched() 
     print("DEBUG: total_dispatched =", total_dispatched) 
    
     # Warehouse summary calculations
@@ -1067,11 +1115,11 @@ def endday(Whrsh_Outlets_id):
             })
 
     # Case B: Record exists but from yesterday → lock
-    elif last_log and last_log.created_at.date() < date.today():
-        return jsonify({
-            "status": "locked",
-            "message": "Cannot overwrite yesterday's End of Day. Records are locked after midnight."
-        })
+    #elif last_log and last_log.created_at.date() < date.today():
+    #    return jsonify({
+    #        "status": "locked",
+    #        "message": "Cannot overwrite yesterday's End of Day. Records are locked after midnight."
+    #    })
 
     # Case C: No record yet today → insert new
     else:
