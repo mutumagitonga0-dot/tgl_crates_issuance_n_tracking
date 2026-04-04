@@ -30,23 +30,23 @@
         <td>-</td>
       </tr>
       <tr class="table-success">
-        <td>Today's Warehouse Available after Day closure</td>
-        <td>{{ current_balance }}</td>
+        <td>Today's Warehouse Available For Use after Day closure</td>
+        <td>{{ total_available_for_use }}</td>
         <td>-</td>
       </tr>
       <tr>
         <td>Today's Total Issued to Outlets</td>
-        <td>{{ total_sent }}</td>
+        <td>{{ total_dispatched_today }}</td>
         <td>-</td>
       </tr>
       <tr>
         <td>Today's Total Received Back</td>
-        <td>{{ total_received }}</td>
-        <td>{{ collection_perf }}%</td>
+        <td>{{ total_collected_today }}</td>
+        <td>{{ available_pct_today }}%</td>
       </tr>
       <tr class="{{ color }}">
-        <td>Today's Variance (Issued - Received)</td>
-        <td>{{ variance }}</td>
+        <td>Today's Variance (total_dispatched_today - total_collected_today)</td>
+        <td>{{ variance_today }}</td>
         <td>-</td>
       </tr>
     </tbody>
