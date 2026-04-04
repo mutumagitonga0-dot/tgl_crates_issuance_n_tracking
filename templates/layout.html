@@ -2,94 +2,107 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Crate Tracker</title>
+  <title>{% block title %}Crate Tracker{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .navbar {
+      font-size: 1rem;
+      letter-spacing: 0.5px;
+    }
+    .navbar-brand {
+      font-size: 1.25rem;
+    }
+    .navbar-nav .nav-link {
+      color: #bbb;
+      margin: 0 5px;
+      padding: 8px 15px;
+      border-radius: 4px;
+      transition: all 0.3s ease;
+    }
+    .navbar-nav .nav-link:hover {
+      color: #fff;
+      background-color: rgba(255,255,255,0.1);
+    }
+    .navbar-nav .nav-link.active {
+      color: #fff;
+      background-color: #0d6efd;   /* Bootstrap primary blue */
+      border-bottom: 3px solid #ffc107; /* gold accent underline */
+      font-weight: 600;
+      box-shadow: inset 0 -2px 0 rgba(255,255,255,0.2);
+    }
+    body {
+      padding-top: 70px; /* prevent content hiding under fixed navbar */
+    }
+
+.readonly-highlight{
+  background-color: #ffff99; /* light yellow */
+}
+
+fetch(this.action, {
+  method: "POST",
+  body: new FormData(this)
+})
+.then(res => res.text())
+.then(text => {
+  // Show raw response on the page
+  const debugBox = document.createElement("pre");
+  debugBox.className = "alert alert-info mt-3";
+  debugBox.textContent = "Raw server response:\n" + text;
+  document.body.appendChild(debugBox);
+})
+.catch(err => {
+  const errorBox = document.createElement("div");
+  errorBox.className = "alert alert-danger mt-3";
+  errorBox.textContent = "Full error: " + err.message;
+  document.body.appendChild(errorBox);
+});
+
+
+
+
+  </style>
 </head>
 <body>
 
 <!-- Navigation Bar -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
   <div class="container-fluid">
-    <a class="navbar-brand" href="/">📦 Crate Tracker</a>
+    <a class="navbar-brand fw-bold text-primary" href="{{ url_for('home') }}">📦Tunda Green Ltd Crate Tracker</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="/home">Home</a></li>
-        <li class="nav-item"><a class="nav-link" href="/dashboard">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link" href="/dispatch">Dispatch</a></li>
-        <li class="nav-item"><a class="nav-link" href="/collect">Collection</a></li>
-        <li class="nav-item"><a class="nav-link" href="/manage_users">Manage Users</a></li>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'home' %}active{% endif %}" href="{{ url_for('home') }}">Home</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'record_dispatch' %}active{% endif %}" href="{{ url_for('record_dispatch') }}">Dispatch</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'record_collection' %}active{% endif %}" href="{{ url_for('record_collection') }}">Collection</a></li>
+        <li class="nav-item"><a class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}" href="{{ url_for('manage_users') }}">Manage Users</a></li>
       </ul>
     </div>
   </div>
 </nav>
 
-  <div class="container mt-4">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
 
-    {% block content %}{% endblock %}
-  </div>
+<div class="container mt-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
 
-<style>
-.dashboard-title {
-    text-align: center;
-    font-weight: 900; /* extra bold */
-    font-size: 2.5rem; /* larger size */
-    position: sticky;   /* freeze on scroll */
-    top: 0;             /* stick to top of viewport */
-    background-color: #f8f9fa; /* solid background so text is readable */
-    z-index: 10;        /* keep above other content */
-    padding: 10px;
-  }
+  {% block content %}{% endblock %}
+</div>
 
-.readonly-highlight {
-  background-color: #f0f0f0;
-  font-weight: bold;
-  color: #333;
-  cursor: not-allowed;
-  user-select: none;
-  /*pointer-events: none;
-}
+<footer class="bg-light text-center text-muted py-3 mt-4 border-top">
+  <small>&copy; 2026 Crate Tracker | Designed for operational excellence</small>
+</footer>
 
-.locked-field {
-  background-color: #e9ecef;   /* Bootstrap's disabled gray */
-  font-weight: bold;           /* bold text */
-  color: #495057;              /* darker text */
-  cursor: not-allowed;         /* blocked cursor */
-  user-select: none;           /* prevents text selection */
-}
-
-  /* Freeze table header row */
-/*.table thead th {
-/*    position: sticky;
-/*    top: 0;
-/*    background-color: #fff; /* keep header visible */
-/*    z-index: 5;
-*/  }
-
-</style>
-
-<script>
-  document.getElementById("print-btn").addEventListener("click", function() {
-    window.print();
-  });
-</script>
-
-  <footer class="bg-light text-center text-muted py-3 mt-4 border-top">
-    <small>&copy; 2026 Crate Tracker | Designed for operational excellence</small>
-  </footer>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

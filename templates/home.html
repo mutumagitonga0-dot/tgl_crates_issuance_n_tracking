@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="d-grid gap-3 mb-4">
+  <a href="{{ url_for('record_dispatch') }}" class="btn btn-success btn-lg">➕ Record Dispatch</a>
+  <a href="{{ url_for('record_collection') }}" class="btn btn-warning btn-lg">📥 Record Collection</a>
+  <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">📋 Daily Outlets Performance Dashboard</a>
+</div>
+
+<div class="border p-3 mb-3 rounded bg-info bg-opacity-25">
+  <h4 class="text-center">📊 Main Warehouse Summary</h4>
+  <table class="table table-bordered table-striped">
+    <thead class="table-light">
+      <tr>
+        <th>Metric</th>
+        <th>Crates</th>
+        <th>Collection Performance %</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Total Crates Confirmed on last Stocktake</td>
+        <td>{{ warehouse_total }}</td>
+        <td>-</td>
+      </tr>
+      <tr class="table-success">
+        <td>Rotational Current Warehouse Balance</td>
+        <td>{{ current_balance }}</td>
+        <td>-</td>
+      </tr>
+      <tr class="table-success">
+        <td>Today's Warehouse Available after Day closure</td>
+        <td>{{ current_balance }}</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>Today's Total Issued to Outlets</td>
+        <td>{{ total_sent }}</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>Today's Total Received Back</td>
+        <td>{{ total_received }}</td>
+        <td>{{ collection_perf }}%</td>
+      </tr>
+      <tr class="{{ color }}">
+        <td>Today's Variance (Issued - Received)</td>
+        <td>{{ variance }}</td>
+        <td>-</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

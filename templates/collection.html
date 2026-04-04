@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+{% block title %}Record Collection{% endblock %}
+
+{% block content %}
+<form method="post" class="card p-3"
+      onsubmit="if (!confirm('Do you want to proceed collecting ' 
+      + document.querySelector('[name=crates_collected]').value 
+      + ' crates from outlet ' 
+      + document.querySelector('[name=outlet_name]').value 
+      + ' by staff ' 
+      + document.querySelector('[name=staff_name]').value + '?')) {
+          document.querySelector('[name=cancelled]').value = 'true';
+      }
+      return true;">
+  <input type="hidden" name="cancelled" value="false">
+
+  <h2>Record Collection</h2>
+
+  <div class="mb-3">
+    <label class="form-label">Outlet</label>
+    <select name="outlet_name" class="form-select" required>
+      <option value="" selected>-- Select Outlet --</option>
+      {% for o in outlets %}
+        <option value="{{ o }}">{{ o }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Crates Collected Here</label>
+    <input type="number" name="crates_collected" class="form-control" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Collected By (Staff Name)</label>
+    <select name="staff_name" class="form-select" required>
+      <option value="" selected>-- Select Staff --</option>
+      {% for u in users %}
+        <option value="{{ u }}">{{ u }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Submit Collection</button>
+</form>
+
+<a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a>
+{% endblock %}

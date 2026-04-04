@@ -1,11 +1,10 @@
 from flask import Flask, request, render_template_string, redirect, url_for, flash, render_template, jsonify
 from flask_sqlalchemy import SQLAlchemy 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text,cast,Date
 from flask_migrate import Migrate
 from datetime import datetime,timezone,date
 import os
 import uuid
-
 
 
 #from flask import Flask, render_template, request, redirect, url_for, flash
@@ -124,68 +123,6 @@ class EndDayLog(db.Model):
 
     #warehouse = db.relationship("Warehouse", backref="end_day_logs")
 
-# --- Layout Template with Navbar ---
-layout = """
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Crate Tracker</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-
-  <!-- Navigation Bar -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="/">📦 Crate Tracker</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav me-auto">
-          <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
-          <li class="nav-item"><a class="nav-link" href="/dashboard">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="/dispatch">Dispatch</a></li>
-          <li class="nav-item"><a class="nav-link" href="/collect">Collection</a></li>
-          <li class="nav-item"><a class="nav-link" href="/manage_users">Manage Users</a></li>
-        </ul>
-      </div>
-    </div>
-  </nav>
-
-  <div class="container mt-4">
-
-    <!-- Flash messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-          </div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-
-    {{ content|safe }}
-
-  </div>
-
-  <!-- Footer -->
-  <footer class="bg-light text-center text-muted py-3 mt-4 border-top">
-    <small>&copy; 2026 Crate Tracker | Designed for operational excellence</small>
-  </footer>
-
-  <!-- Bootstrap JS Bundle (needed for modal, navbar, alerts) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-"""
-
-# --- Reusable Home Button ---
-home_button = "<a href='/' class='btn btn-secondary mt-3'>⬅️ Return to Home</a>"
 
 # Secure one-time init route
 #http://127.0.0.1:10000/init-db?token=changeme #to create all tables manually
@@ -249,6 +186,120 @@ def github_instructions():
 ## --- Routes ---
 @app.route("/")
 def home():
+    outlets = Outlet.query.all()
+
+    dispatched = (
+        db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+        .filter(WarehouseTransaction.transaction_type == 'dispatch')
+        .scalar()
+    ) or 0
+
+    collected = (
+        db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+        .filter(WarehouseTransaction.transaction_type == 'collection')
+        .scalar()
+    ) or 0
+
+    variance = dispatched - collected
+    color = "table-danger" if variance > 0 else "table-success"
+
+    warehouse_total = recent_wrhse_crates_stocktake_count()
+
+    total_sent = dispatched
+    total_received = collected
+    current_balance = warehouse_total - total_sent + total_received
+
+    # Instead of building HTML here, just pass the values to the template
+    return render_template(
+        "home.html",
+        warehouse_total=warehouse_total,
+        current_balance=current_balance,
+        total_sent=total_sent,
+        total_received=total_received,
+        variance=variance,
+        outlets=outlets
+    )
+
+@app.route("/")
+def ffffff_home():
+    outlets = Outlet.query.all()
+
+    dispatched = (
+        db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+        .filter(WarehouseTransaction.transaction_type == 'dispatch')
+        .scalar()
+    ) or 0
+
+    collected = (
+        db.session.query(db.func.sum(WarehouseTransaction.good_crates))
+        .filter(WarehouseTransaction.transaction_type == 'collection')
+        .scalar()
+    ) or 0
+
+    variance = dispatched - collected
+    color = "table-danger" if variance > 0 else "table-success"
+
+    warehouse_total = recent_wrhse_crates_stocktake_count()
+
+    total_sent = dispatched
+    total_received = collected
+    current_balance = warehouse_total - total_sent + total_received
+
+    summary_table = f"""
+    <div class="border p-3 mb-3 rounded bg-info bg-opacity-25">
+      <h4 class="text-center">📊 Main Warehouse Summary</h4>
+      <table class="table table-bordered table-striped">
+        <thead class="table-light">
+          <tr>
+            <th>Metric</th>
+            <th>Crates</th>
+            <th>Availability %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Total Crates Confirmed on last Stocktake</td>
+            <td>{warehouse_total}</td>
+          </tr>
+          <tr class="table-success">
+            <td>Rotational Current Warehouse Balance</td>
+            <td>{current_balance}</td>
+          </tr>
+          <tr class="table-success">
+            <td>Today's Warehouse Available after Day closure</td>
+            <td>{current_balance}</td>
+          </tr>
+          <tr>
+            <td>Total Issued to Outlets</td>
+            <td>{total_sent}</td>
+          </tr>
+          <tr>
+            <td>Total Received Back</td>
+            <td>{total_received}</td>
+          </tr>
+          <tr class="table-warning">
+            <td>Variance (Issued - Received)</td>
+            <td>{variance}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    """
+
+    shortcuts = """
+    <div class="d-grid gap-3 mb-4">
+      <a href="/dispatch" class="btn btn-success btn-lg">➕ Record Dispatch</a>
+      <a href="/collect" class="btn btn-warning btn-lg">📥 Record Collection</a>
+      <a href="/dashboard" class="btn btn-primary btn-lg">📋 Daily Outlets Performance Dashboard</a>
+    </div>
+    """
+
+    content = shortcuts + summary_table
+    return render_template_string(layout, content=content, request=request)
+
+
+@app.route("/_fff")
+def fff_home():
     outlets = Outlet.query.all()
     rows = ""
     
@@ -369,7 +420,9 @@ def home():
     """
 
     content = shortcuts + summary_table
-    return render_template_string(layout, content=content)
+    #return render_template_string(layout, content=content)
+    return render_template_string(layout, content=content, request=request)
+
 
 
 def retrieve_outlets():
@@ -480,6 +533,149 @@ def record_loss(warehouse_id, crates, description="Damaged crates"):
 
 @app.route("/dispatch", methods=["GET", "POST"])
 def record_dispatch():
+    db.create_all()
+
+    # Step 1: Fetch branch names and users
+    outlets = [name for name, name in retrieve_outlets()]
+    users = retrieve_offline_users()
+
+    if request.method == "POST":
+        if request.form.get("cancelled") == "true":
+            flash("Submission cancelled by user.", "warning")
+            return redirect(request.url)
+
+        branchname = request.form.get("outlet_name")
+        outlet_t = Outlet.query.filter_by(name=branchname).first()
+        warehouse_id = outlet_t.outlet_id if outlet_t else None
+
+        try:
+            good_crates = int(request.form.get("crates_sent"))
+        except (TypeError, ValueError):
+            good_crates = 0
+
+        staff_name = request.form.get("staff_name") or ""
+        if good_crates <= 0 or not staff_name:
+            flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
+            return redirect(request.url)
+
+        new_warehouse_rcrd = WarehouseTransaction(
+            Wrhse_outlet_id=warehouse_id,
+            good_crates=good_crates,
+            worn_crates=0,
+            disposed_crates=0,
+            transaction_type="dispatch",
+            notes=branchname,
+            staff_name=staff_name
+        )
+        db.session.add(new_warehouse_rcrd)
+        db.session.commit()
+
+        flash(f"Dispatch recorded: {good_crates} crates sent to {branchname} by {staff_name}.", "success")
+        return redirect(url_for("dashboard"))
+
+    # Step 2: Render template, passing outlets and users
+    return render_template("dispatch.html", outlets=outlets, users=users)
+
+#@app.route("/dispatch", methods=["GET", "POST"])
+def fff_record_dispatch():
+    # At app startup, or before you insert
+    db.create_all()
+
+    # Step 1: Fetch branch names from external DB or helper
+    outlets = retrieve_outlets()
+    outlets = [name for name, name in outlets]
+
+    Users = retrieve_offline_users()
+
+    # Step 2: Build the form HTML dynamically
+    options_html = "".join([f'<option value="{o}">{o}</option>' for o in outlets])
+    users_html = "".join([f'<option value="{o}">{o}</option>' for o in Users])
+
+    dispatch_form = f"""
+    <form method="post" class="card p-3"
+          onsubmit="if (!confirm('Do you want to proceed dispatching ' 
+          + document.querySelector('[name=crates_sent]').value 
+          + ' crates to outlet ' 
+          + document.querySelector('[name=outlet_name]').value 
+          + ' by staff ' 
+          + document.querySelector('[name=staff_name]').value + '?')) {{
+              document.querySelector('[name=cancelled]').value = 'true';
+          }}
+          return true;">
+      <input type="hidden" name="cancelled" value="false">
+
+      <h2>Record Dispatch</h2>
+      <div class="mb-3">
+        <label class="form-label">Outlet</label>
+        <select name="outlet_name" class="form-select" required>
+          <option value="" selected>-- Select Outlet --</option>
+          {options_html}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Crates Left here</label>
+        <input type="number" name="crates_sent" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Incharge (Staff Name)</label>
+        <select name="staff_name" class="form-select" required>
+          <option value="" selected>-- Select Staff --</option>
+          {users_html}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit Dispatch</button>
+    </form>
+    {home_button}
+    """
+
+    # Step 3: Handle submission
+    if request.method == "POST":
+        if request.form.get("cancelled") == "true":
+            flash("Submission cancelled by user.", "warning")
+            return redirect(request.url)
+
+        branchname = request.form.get("outlet_name")
+        outlet_t = Outlet.query.filter_by(name=branchname).first()
+        warehouse_id = outlet_t.outlet_id if outlet_t else None
+
+        good_crates = request.form.get("crates_sent")
+        worn_crates = 0
+        disposed_crates = 0
+        staff_name = request.form.get("staff_name")
+        transaction_type = "dispatch"
+        notes = branchname
+
+        try:
+            good_crates = int(good_crates)
+        except (TypeError, ValueError):
+            good_crates = 0
+
+        staff_name = str(staff_name or "")
+
+        if good_crates <= 0 or not staff_name:
+            flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
+            return redirect(request.url)
+
+        new_warehouse_rcrd = WarehouseTransaction(
+            Wrhse_outlet_id=warehouse_id,
+            good_crates=good_crates,
+            worn_crates=worn_crates,
+            disposed_crates=disposed_crates,
+            transaction_type=transaction_type,
+            notes=notes,
+            staff_name=staff_name
+        )
+        db.session.add(new_warehouse_rcrd)
+        db.session.commit()
+
+        flash(f"Dispatch recorded: {good_crates} crates sent to {branchname} by {staff_name}.", "success")
+        return redirect(url_for("dashboard"))
+
+    # Step 4: Render with your existing layout
+    return render_template_string(layout, content=dispatch_form, request=request)
+
+@app.route("/fff_dispatch", methods=["GET", "POST"])
+def fff_record_dispatch():
     # At app startup, or before you insert
     db.create_all()
     # Step 1: Fetch branch names from external DB or helper
@@ -589,8 +785,52 @@ def record_dispatch():
     # Step 4: Render with your existing layout
     return render_template_string(layout, content=dispatch_form)
 
-@app.route("/collect", methods=["GET", "POST"])
+@app.route("/collection", methods=["GET", "POST"])
 def record_collection():
+    db.create_all()
+
+    outlets = [name for name, name in retrieve_outlets()]
+    users = retrieve_offline_users()
+
+    if request.method == "POST":
+        if request.form.get("cancelled") == "true":
+            flash("Submission cancelled by user.", "warning")
+            return redirect(request.url)
+
+        branchname = request.form.get("outlet_name")
+        outlet_t = Outlet.query.filter_by(name=branchname).first()
+        warehouse_id = outlet_t.outlet_id if outlet_t else None
+
+        try:
+            good_crates = int(request.form.get("crates_collected"))
+        except (TypeError, ValueError):
+            good_crates = 0
+
+        staff_name = request.form.get("staff_name") or ""
+        if good_crates <= 0 or not staff_name:
+            flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
+            return redirect(request.url)
+
+        new_warehouse_rcrd = WarehouseTransaction(
+            Wrhse_outlet_id=warehouse_id,
+            good_crates=good_crates,
+            worn_crates=0,
+            disposed_crates=0,
+            transaction_type="collection",
+            notes=branchname,
+            staff_name=staff_name
+        )
+        db.session.add(new_warehouse_rcrd)
+        db.session.commit()
+
+        flash(f"Collection recorded: {good_crates} crates returned from {branchname} by {staff_name}.", "success")
+        return redirect(url_for("dashboard"))
+
+    # Render template, passing outlets and users
+    return render_template("collection.html", outlets=outlets, users=users)
+
+#@app.route("/collect", methods=["GET", "POST"])
+def fff_record_collection():
     # At app startup, or before you insert
     db.create_all()
 
@@ -793,6 +1033,165 @@ def total_daily_crates_collected_withno_timeline():
 
 @app.route("/dashboard")
 def dashboard():
+    # Ensure at least one warehouse exists
+    warehouse = Warehouse.query.first()
+    if not warehouse:
+        warehouse = Warehouse(
+            name="Tgl Warehouse",
+            Whrsh_Outlets_id=1,
+            good_crates=0,
+            worn_crates=0,
+            disposed_crates=0,
+            dispatched_crates=0,
+            collected_crates=0,
+            total_crates=0
+        )
+        db.session.add(warehouse)
+        db.session.commit()
+        flash("Default warehouse created: Tgl Warehouse", "info")
+
+    # Outlets with transactions
+    dispatched_outlets = db.session.query(WarehouseTransaction.Wrhse_outlet_id).distinct().all()
+    outlet_ids = [id for (id,) in dispatched_outlets]
+    outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
+    all_outlets = [name for (name,) in outlet_names]
+
+    # Build outlet stats
+    outlet_stats = []
+    for outlet_name in all_outlets:
+        last_end_day = get_last_end_day_date()
+
+        collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+            .filter(WarehouseTransaction.notes == outlet_name,
+                    WarehouseTransaction.transaction_type == 'collection')
+        dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+            .filter(WarehouseTransaction.notes == outlet_name,
+                    WarehouseTransaction.transaction_type == 'dispatch')
+
+        if last_end_day:
+            collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
+            dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+        collected = collected_query.scalar() or 0
+        dispatched = dispatched_query.scalar() or 0
+
+        recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+            .filter(WarehouseTransaction.notes == outlet_name,
+                    WarehouseTransaction.transaction_type == 'collection').scalar() or 0
+        recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+            .filter(WarehouseTransaction.notes == outlet_name,
+                    WarehouseTransaction.transaction_type == 'dispatch').scalar() or 0
+
+        recurrent_balance = recurrent_dispatched - recurrent_collected
+        variance = dispatched - collected
+        color = "table-danger" if variance > 0 else "table-success"
+
+        outlet_stats.append({
+            "name": outlet_name,
+            "recurrent_balance": recurrent_balance,
+            "dispatched": dispatched,
+            "collected": collected,
+            "variance": variance,
+            "color": color
+        })
+
+    total_collected = total_daily_crates_collected()
+    total_dispatched = total_daily_crates_dispatched()
+    recent_stcktake_crate = recent_wrhse_crates_stocktake_count()
+
+    total_available = recent_stcktake_crate - total_dispatched + total_collected
+    variance = total_collected - total_dispatched
+    denominator = recent_stcktake_crate
+    available_pct = (total_available / denominator * 100) if denominator > 0 else 0
+
+    warehouse_summary = {
+        "name": warehouse.name,
+        "last_stocktake": recent_stcktake_crate,
+        "total_available": total_available,
+        "total_dispatched": total_dispatched,
+        "total_collected": total_collected,
+        "variance": variance,
+        "available_pct": round(available_pct, 2)
+    }
+
+    users = retrieve_offline_users()
+    last_rec = EndDayLog.query.order_by(EndDayLog.created_at.desc()).first()
+    reconciliations = EndDayLog.query.order_by(EndDayLog.created_at.desc()).limit(20).all()
+
+    most_recent_stocktake = WarehouseTransaction.query\
+        .filter_by(transaction_type="stocktake", Wrhse_outlet_id=1)\
+        .order_by(WarehouseTransaction.timestamp.desc()).first()
+
+    if most_recent_stocktake:
+        last_stocktake_time = most_recent_stocktake.timestamp.strftime("%d %B %Y")
+        warehouse_summary_text = f"Warehouse Summary Based On : Last Stocktake : <span style='color:blue;'>{last_stocktake_time}</span>"
+    else:
+        warehouse_summary_text = "<span style='color:red;'>Warehouse Summary : No stocktake transactions found</span>"
+
+    rows = ""
+    for outlet_name in all_outlets:
+      """
+      Calculate collected and dispatched crates for a given outlet
+      since the last end day cutoff.
+      """
+      last_end_day = get_last_end_day_date()
+
+      collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'collection'
+        )
+      
+      dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'dispatch'
+        )
+
+      # Apply cutoff if it exists
+      if last_end_day:
+        collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
+        dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+      collected = collected_query.scalar() or 0
+      dispatched = dispatched_query.scalar() or 0
+      
+      # Recurrent balance: all-time (no cutoff filter)
+      recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+          .filter(
+              WarehouseTransaction.notes == outlet_name,
+              WarehouseTransaction.transaction_type == 'collection'
+          ).scalar() or 0
+
+      recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+          .filter(
+              WarehouseTransaction.notes == outlet_name,
+              WarehouseTransaction.transaction_type == 'dispatch'
+          ).scalar() or 0
+
+      recurrent_balance = recurrent_dispatched - recurrent_collected
+
+      variance = dispatched - collected
+      color = "table-danger" if variance > 0 else "table-success"
+      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{dispatched}</td><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
+
+
+    return render_template(
+        "dashboard.html",
+        warehouse=warehouse,
+        rows=rows,
+        warehouse_summary=warehouse_summary,
+        warehouse_summary_text=warehouse_summary_text,
+        outlet_stats=outlet_stats,
+        users=users,
+        last_rec=last_rec,
+        reconciliations=reconciliations,
+        app_auto_collections=total_collected,
+        app_auto_dispatches=total_dispatched
+    )
+
+#@app.route("/dashboard")
+def fff_dashboard():
     # ... all your warehouse/outlet logic stays the same ...
   # ✅ Ensure at least one warehouse exists
     warehouse = Warehouse.query.first()
@@ -1069,8 +1468,172 @@ def get_reconciliations(offset=0):
         })
     return {"reconciliations": data}
 
+
 @app.route("/warehouse/<int:Whrsh_Outlets_id>/endday", methods=["POST"])
 def endday(Whrsh_Outlets_id):
+    warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=Whrsh_Outlets_id).first_or_404()
+    
+    dispatched_crates = request.form.get("app_dispatched")
+    physical_crates = request.form.get("physical_crates")
+    app_collections = request.form.get("app_collections")
+    variance = request.form.get("variance")
+    staff_name = request.form.get("staff_name")
+    remarks = request.form.get("remarks")
+    overwrite = request.form.get("overwrite")
+
+    last_log = (
+    EndDayLog.query
+    .filter(cast(EndDayLog.created_at, Date) == date.today())
+    .order_by(EndDayLog.created_at.desc())
+    .first()
+    )
+
+    if last_log and not overwrite:
+        new_values = {
+            "dispatched_crates":dispatched_crates,
+            "physical_crates": physical_crates,
+            "app_collections": app_collections,
+            "variance": variance,
+            "staff_name": staff_name,
+            "remarks": remarks
+        }
+        return jsonify({
+            "status": "exists",
+            "last_log": {
+                "physical_crates": last_log.physical_crates,
+                "app_collections": last_log.app_collections,
+                "variance": last_log.variance,
+                "staff_name": last_log.staff_name,
+                "remarks": last_log.remarks
+            },
+            "new_values": new_values
+        })
+
+    # Insert or overwrite
+    new_log = EndDayLog(
+        warehouse_id=warehouse.Whrsh_Outlets_id,   # <-- critical fix
+        dispatched_crates=dispatched_crates,
+        physical_crates=physical_crates,
+        app_collections=app_collections,
+        variance=variance,
+        staff_name=staff_name,
+        remarks=remarks
+    )
+    db.session.add(new_log)
+    db.session.commit()
+
+    return jsonify({"status": "updated", "message": "End of Day recorded successfully"})
+
+@app.route("/fffff_warehouse/<int:Whrsh_Outlets_id>/endday", methods=["POST"])
+def endday_gggf(Whrsh_Outlets_id):
+    warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=Whrsh_Outlets_id).first_or_404()
+
+    physical_crates = request.form.get("physical_crates")
+    app_collections = request.form.get("app_collections")
+    variance = request.form.get("variance")
+    staff_name = request.form.get("staff_name")
+    remarks = request.form.get("remarks")
+    overwrite = request.form.get("overwrite")
+
+    try:
+        last_log = (
+            EndDayLog.query
+            .filter(func.date(EndDayLog.created_at) == date.today())
+            .order_by(EndDayLog.created_at.desc())
+            .first()
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+    if last_log and not overwrite:
+        new_values = {
+            "physical_crates": physical_crates,
+            "app_collections": app_collections,
+            "variance": variance,
+            "staff_name": staff_name,
+            "remarks": remarks
+        }
+        return jsonify({
+            "status": "exists",
+            "last_log": {
+                "physical_crates": last_log.physical_crates,
+                "app_collections": last_log.app_collections,
+                "variance": last_log.variance,
+                "staff_name": last_log.staff_name,
+                "remarks": last_log.remarks
+            },
+            "new_values": new_values
+        })
+
+    new_log = EndDayLog(
+        physical_crates=physical_crates,
+        app_collections=app_collections,
+        variance=variance,
+        staff_name=staff_name,
+        remarks=remarks
+    )
+    db.session.add(new_log)
+    db.session.commit()
+
+    return jsonify({"status": "updated", "message": "End of Day recorded successfully"})
+
+@app.route("/ff_warehouse/<int:Whrsh_Outlets_id>/endday", methods=["POST"])
+def endday_fff(Whrsh_Outlets_id):
+    #warehouse = Warehouse.query.get_or_404(warehouse_id)
+    warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=Whrsh_Outlets_id).first_or_404()
+
+    physical_crates = request.form.get("physical_crates")
+    app_collections = request.form.get("app_collections")
+    variance = request.form.get("variance")
+    staff_name = request.form.get("staff_name")
+    remarks = request.form.get("remarks")
+    overwrite = request.form.get("overwrite")
+    
+    # Check if today's End of Day already exists
+    
+    last_log = (
+        EndDayLog.query
+        .filter(func.date(EndDayLog.created_at) == date.today())
+        .order_by(EndDayLog.created_at.desc())
+        .first()
+    ) #first alone throwing errors
+    
+    
+    #return jsonify({"status": "error", "message": str(e)}), 500
+
+    if last_log and not overwrite:
+        # Show overwrite confirmation card
+        new_values = {
+            "physical_crates": physical_crates,
+            "app_collections": app_collections,
+            "variance": variance,
+            "staff_name": staff_name,
+            "remarks": remarks
+        }
+        return render_template(
+            "dashboard.html",
+            last_log=last_log,
+            new_values=new_values,
+            warehouse=warehouse
+        )
+
+    # Otherwise, insert or overwrite
+    new_log = EndDayLog(
+        physical_crates=physical_crates,
+        app_collections=app_collections,
+        variance=variance,
+        staff_name=staff_name,
+        remarks=remarks
+    )
+    db.session.add(new_log)
+    db.session.commit()
+    flash("End of Day recorded successfully.", "success")
+    return jsonify({"status": "updated", "message": "End of Day recorded successfully"})
+    
+    return redirect(url_for("dashboard"))
+
+#@app.route("/warehouse/<int:Whrsh_Outlets_id>/endday", methods=["POST"])
+def fff_endday(Whrsh_Outlets_id):
     print("DEBUG: Entered endday route with ID =", Whrsh_Outlets_id)
     print("DEBUG: mutuma onit")
     warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=Whrsh_Outlets_id).first_or_404()
@@ -1271,9 +1834,63 @@ def warehouse_stocktake(Whrsh_Outlets_id):
     flash("Stocktake updated successfully!", "success")
     return redirect(url_for('dashboard'))
 
-
 @app.route("/manage_users", methods=["GET", "POST"])
 def manage_users():
+    create_message = ""
+    update_message = ""
+    delete_message = ""
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "create":
+            name = request.form.get("name")
+            existing_user = Users.query.filter_by(staff_name=name).first()
+            if existing_user:
+                create_message = f"User '{name}' already exists!"
+            else:
+                new_user = Users(staff_name=name)
+                db.session.add(new_user)
+                db.session.commit()
+                create_message = f"User '{name}' added successfully!"
+
+        elif action == "update":
+            user_id = request.form.get("username")
+            new_name = request.form.get("new_name")
+            if not new_name:
+                update_message = "New name is required."
+            else:
+                user = Users.query.get(user_id)
+                if user:
+                    oldname = user.staff_name
+                    user.staff_name = new_name
+                    db.session.commit()
+                    update_message = f"User '{oldname}' updated to '{new_name}' successfully!"
+                else:
+                    update_message = "User not found."
+
+        elif action == "delete":
+            user_id = request.form.get("del_username")
+            user = Users.query.get(user_id)
+            if user:
+                db.session.delete(user)
+                db.session.commit()
+                delete_message = f"User '{user.staff_name}' deleted successfully!"
+            else:
+                delete_message = "User not found."
+
+    users = Users.query.all()
+
+    return render_template(
+        "manage_users.html",
+        users=users,
+        create_message=create_message,
+        update_message=update_message,
+        delete_message=delete_message
+    )
+
+#@app.route("/manage_users", methods=["GET", "POST"])
+def fff_manage_users():
     #message = ""
 
     create_message = ""
