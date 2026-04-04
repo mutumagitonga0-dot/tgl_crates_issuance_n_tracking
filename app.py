@@ -209,14 +209,35 @@ def home():
     total_received = collected
     current_balance = warehouse_total - total_sent + total_received
 
+
+    total_collected_today = total_daily_crates_collected()
+    print("total_collected_today",  total_collected_today)
+    total_dispatched_today = total_daily_crates_dispatched()
+    print("total_dispatched_today",  total_dispatched_today)
+    recent_stcktake_crate = recent_wrhse_crates_stocktake_count()
+    print("recent_stcktake_crate",  recent_stcktake_crate)
+    total_available_for_use = recent_stcktake_crate - total_dispatched_today + total_collected_today
+    print("total_available_for_use",  total_available_for_use)
+    variance_today = total_collected_today - total_dispatched_today
+    print("variance_today",  variance_today)
+    denominator = recent_stcktake_crate
+    print("denominator",  denominator)
+    available_pct_today = (total_available_for_use / denominator * 100) if denominator > 0 else 0
+    print("available_pct_today",  available_pct_today)
+
     # Instead of building HTML here, just pass the values to the template
     return render_template(
         "home.html",
         warehouse_total=warehouse_total,
         current_balance=current_balance,
+        total_available_for_use=total_available_for_use,
         total_sent=total_sent,
+        total_dispatched_today=total_dispatched_today,
         total_received=total_received,
+        total_collected_today=total_collected_today,
         variance=variance,
+        variance_today=variance_today,
+        available_pct_today=available_pct_today,
         outlets=outlets
     )
 
