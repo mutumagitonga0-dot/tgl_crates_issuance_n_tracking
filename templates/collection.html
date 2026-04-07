@@ -10,7 +10,9 @@
       + ' by staff ' 
       + document.querySelector('[name=staff_name]').value + '?')) {
           document.querySelector('[name=cancelled]').value = 'true';
+          return false; // stop submission if cancelled
       }
+      document.getElementById('submitBtn').disabled = true; 
       return true;">
   <input type="hidden" name="cancelled" value="false">
 
@@ -41,7 +43,7 @@
     </select>
   </div>
 
-  <button type="submit" class="btn btn-primary">Submit Collection</button>
+  <button type="submit" class="btn btn-primary" id="submitBtn">Submit Collection</button>
 </form>
 
 <a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a>
