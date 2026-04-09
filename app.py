@@ -166,9 +166,9 @@ def push_to_github():
     #git commit -m "Describe your changes here"
     #git push
 
-  import subprocess
+    import subprocess
 
-def connect_sqlalchemy_database_cmd():
+def connect_sqlalchemy_database_through_cmd():
     # Path to your psql.exe
     psql_path = r"C:\Program Files\PostgreSQL\18\bin\psql.exe"
     
