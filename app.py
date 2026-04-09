@@ -891,7 +891,7 @@ def endday(Whrsh_Outlets_id):
         print("outlets name to auto add", outlet_name)
         d, c, rb, v, oid = get_daily_dispatch_vers_collection(outlet_name)
 
-        if v != (d - c):
+        if v > 0 and v != (d - c):
           continue
 
 
