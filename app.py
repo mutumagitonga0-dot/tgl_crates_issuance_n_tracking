@@ -895,17 +895,22 @@ def endday(Whrsh_Outlets_id):
           #and v != (d - c):
           continue
 
-
-        new_warehouse_rcrd = WarehouseTransaction(
-            Wrhse_outlet_id=oid,
-            good_crates=v,
-            worn_crates=0,
-            disposed_crates=0,
-            transaction_type="dispatch",
-            notes=outlet_name,
-            staff_name="Admin"
-        )
-        outlet_uncollected_carry_forward.append(new_warehouse_rcrd)
+        if v !=(d-c):
+            new_warehouse_rcrd = WarehouseTransaction(
+                Wrhse_outlet_id=oid,
+                good_crates=v,
+                worn_crates=0,
+                disposed_crates=0,
+                transaction_type="dispatch",
+                notes=outlet_name,
+                staff_name="Admin"
+            )
+            outlet_uncollected_carry_forward.append(new_warehouse_rcrd)
+            continue
+        if v==(d-c): 
+            #if no collection has been done on that branch,then update date to the next day
+           
+            continue
 
     # Insert or overwrite
     new_log = EndDayLog(
