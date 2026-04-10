@@ -842,7 +842,7 @@ def get_reconciliations(offset=0):
 
 @app.route("/warehouse/<int:whrsh_outlets_id>/endday", methods=["POST"])
 def endday(whrsh_outlets_id):
-    warehouse = Warehouse.query.filter_by(whrsh_outlets_id=whrsh_Ootlets_id).first_or_404()
+    warehouse = Warehouse.query.filter_by(whrsh_outlets_id=whrsh_outlets_id).first_or_404()
 
     dispatched_crates = request.form.get("app_dispatched")
     physical_crates = request.form.get("physical_crates")
