@@ -949,7 +949,7 @@ def endday_expired(whrsh_outlets_id):
     .order_by(EndDayLog.created_at.desc())
     .first()
     )
-
+    
     if last_log and not overwrite:
         new_values = {
             "dispatched_crates":dispatched_crates,
