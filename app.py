@@ -520,7 +520,7 @@ def dashboard_main():
     if not warehouse:
         warehouse = Warehouse(
             name="Tgl Warehouse",
-            Whrsh_Outlets_id=1,
+            whrsh_outlets_id=1,
             good_crates=0,
             worn_crates=0,
             disposed_crates=0,
@@ -679,7 +679,7 @@ def dashboard():
     if not warehouse:
         warehouse = Warehouse(
             name="Tgl Warehouse",
-            Whrsh_Outlets_id=1,
+            whrsh_outlets_id=1,
             good_crates=0,
             worn_crates=0,
             disposed_crates=0,
@@ -840,9 +840,9 @@ def get_reconciliations(offset=0):
         })
     return {"reconciliations": data}
 
-@app.route("/warehouse/<int:Whrsh_Outlets_id>/endday", methods=["POST"])
-def endday(Whrsh_Outlets_id):
-    warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=Whrsh_Outlets_id).first_or_404()
+@app.route("/warehouse/<int:whrsh_outlets_id>/endday", methods=["POST"])
+def endday(whrsh_outlets_id):
+    warehouse = Warehouse.query.filter_by(whrsh_outlets_id=whrsh_Ootlets_id).first_or_404()
 
     dispatched_crates = request.form.get("app_dispatched")
     physical_crates = request.form.get("physical_crates")
@@ -914,7 +914,7 @@ def endday(Whrsh_Outlets_id):
 
     # Insert or overwrite
     new_log = EndDayLog(
-        warehouse_id=warehouse.Whrsh_Outlets_id,
+        warehouse_id=warehouse.whrsh_outlets_id,
         dispatched_crates=dispatched_crates,
         physical_crates=physical_crates,
         app_collections=app_collections,
@@ -931,9 +931,9 @@ def endday(Whrsh_Outlets_id):
 
     return jsonify({"status": "updated", "message": "End of Day recorded successfully"})
 
-@app.route("/Expire_Dwarehouse/<int:Whrsh_Outlets_id>/endday", methods=["POST"])
-def endday_expired(Whrsh_Outlets_id):
-    warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=Whrsh_Outlets_id).first_or_404()
+@app.route("/Expire_Dwarehouse/<int:whrsh_outlets_id>/endday", methods=["POST"])
+def endday_expired(whrsh_outlets_id):
+    warehouse = Warehouse.query.filter_by(whrsh_outlets_id=whrsh_outlets_id).first_or_404()
     
     dispatched_crates = request.form.get("app_dispatched")
     physical_crates = request.form.get("physical_crates")
@@ -1010,7 +1010,7 @@ def endday_expired(Whrsh_Outlets_id):
 
     # Insert or overwrite
     new_log = EndDayLog(
-        warehouse_id=warehouse.Whrsh_Outlets_id,   # <-- critical fix
+        warehouse_id=warehouse.whrsh_outlets_id,   # <-- critical fix
         dispatched_crates=dispatched_crates,
         physical_crates=physical_crates,
         app_collections=app_collections,
@@ -1090,14 +1090,14 @@ def validate_staff_selection(field_name="staff_name"):
     return None
 
 #@app.route('/warehouse/<int:warehouse_id>/stocktake', methods=['POST'])
-@app.route('/warehouse/<int:Whrsh_Outlets_id>/stocktake', methods=['POST']) #Whrsh_Outlets_id
-def warehouse_stocktake(Whrsh_Outlets_id):
+@app.route('/warehouse/<int:whrsh_outlets_id>/stocktake', methods=['POST']) #whrsh_outlets_id
+def warehouse_stocktake(whrsh_outlets_id):
   #def warehouse_stocktake(warehouse_id):
     #warehouse = Warehouse.query.get_or_404(warehouse_id)
-    #print("DEBUG: Whrsh_Outlets_id =",Whrsh_Outlets_id)
-    #warehouse_id = Warehouse.query.get_or_404(Whrsh_Outlets_id)
+    #print("DEBUG: whrsh_outlets_id =",whrsh_outlets_id)
+    #warehouse_id = Warehouse.query.get_or_404(whrsh_outlets_id)
 
-    #warehouse_id = Whrsh_Outlets_id
+    #warehouse_id = whrsh_outlets_id
     warehouse_id = 1
     good_crates = int(request.form.get('good_crates', 0))
     worn_crates = int(request.form.get('worn_crates', 0))
@@ -1106,8 +1106,8 @@ def warehouse_stocktake(Whrsh_Outlets_id):
     #description = request.form.get('description', '')
     #ware_hse_name = warehouse_id
   
-    # Query the Warehouse table where Whrsh_Outlets_id matches
-    warehouse = Warehouse.query.filter_by(Whrsh_Outlets_id=warehouse_id).first()
+    # Query the Warehouse table where whrsh_outlets_id matches
+    warehouse = Warehouse.query.filter_by(whrsh_outlets_id=warehouse_id).first()
 
     if warehouse:
         ware_hse_name = warehouse.name
@@ -1130,7 +1130,7 @@ def warehouse_stocktake(Whrsh_Outlets_id):
     #print("DEBUG: branchname =", warehouse_id)
     #warehouse_id=warehouse.id,
     #txn = Warehouse(name=""
-    #  ,Whrsh_Outlets_id=warehouse_id
+    #  ,whrsh_outlets_id=warehouse_id
     #  ,good_crates=good_crates
     #  ,worn_crates=worn_crates
     #  ,disposed_crates=disposed_crates
