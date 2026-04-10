@@ -78,7 +78,7 @@ class Warehouse(db.Model):
     __tablename__ = 'warehouses'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
-    Whrsh_Outlets_id = db.Column(db.Integer, nullable=False)  # just a plain field
+    whrsh_outlets_id = db.Column(db.Integer, nullable=False)  # just a plain field
 
     good_crates = db.Column(db.Integer, default=0)
     worn_crates = db.Column(db.Integer, default=0)
@@ -94,7 +94,7 @@ class Warehouse(db.Model):
 class WarehouseTransaction(db.Model):
     __tablename__ = 'warehouse_transactions'
     id = db.Column(db.Integer, primary_key=True)
-    Wrhse_outlet_id = db.Column(db.Integer, nullable=False)  # just a plain field
+    wrhse_outlet_id = db.Column(db.Integer, nullable=False)  # just a plain field
 
     transaction_type = db.Column(db.String(50), nullable=False)
     good_crates = db.Column(db.Integer, default=0)
@@ -105,7 +105,7 @@ class WarehouseTransaction(db.Model):
     staff_name = db.Column(db.String(50), nullable=False)
 
     def __repr__(self):
-        return f"<WarehouseTransaction {self.transaction_type} for Outlet {self.Wrhse_outlet_id}>"
+        return f"<WarehouseTransaction {self.transaction_type} for Outlet {self.wrhse_outlet_id}>"
 
 class EndDayLog(db.Model):
     __tablename__ = "end_day_logs"
@@ -376,7 +376,7 @@ def record_dispatch():
             return redirect(request.url)
 
         new_warehouse_rcrd = WarehouseTransaction(
-            Wrhse_outlet_id=warehouse_id,
+            wrhse_outlet_id=warehouse_id,
             good_crates=good_crates,
             worn_crates=0,
             disposed_crates=0,
@@ -421,7 +421,7 @@ def record_collection():
             return redirect(request.url)
 
         new_warehouse_rcrd = WarehouseTransaction(
-            Wrhse_outlet_id=warehouse_id,
+            wrhse_outlet_id=warehouse_id,
             good_crates=good_crates,
             worn_crates=0,
             disposed_crates=0,
@@ -533,7 +533,7 @@ def dashboard_main():
         flash("Default warehouse created: Tgl Warehouse", "info")
 
     # Outlets with transactions
-    dispatched_outlets = db.session.query(WarehouseTransaction.Wrhse_outlet_id).distinct().all()
+    dispatched_outlets = db.session.query(WarehouseTransaction.wrhse_outlet_id).distinct().all()
     outlet_ids = [id for (id,) in dispatched_outlets]
     outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
     all_outlets = [name for (name,) in outlet_names]
@@ -601,7 +601,7 @@ def dashboard_main():
     reconciliations = EndDayLog.query.order_by(EndDayLog.created_at.desc()).limit(20).all()
 
     most_recent_stocktake = WarehouseTransaction.query\
-        .filter_by(transaction_type="stocktake", Wrhse_outlet_id=1)\
+        .filter_by(transaction_type="stocktake", wrhse_outlet_id=1)\
         .order_by(WarehouseTransaction.timestamp.desc()).first()
 
     if most_recent_stocktake:
@@ -716,7 +716,7 @@ def dashboard():
     reconciliations = EndDayLog.query.order_by(EndDayLog.created_at.desc()).limit(20).all()
 
     most_recent_stocktake = WarehouseTransaction.query\
-        .filter_by(transaction_type="stocktake", Wrhse_outlet_id=1)\
+        .filter_by(transaction_type="stocktake", wrhse_outlet_id=1)\
         .order_by(WarehouseTransaction.timestamp.desc()).first()
 
     if most_recent_stocktake:
@@ -727,7 +727,7 @@ def dashboard():
 
     rows = ""
     # Outlets with transactions
-    dispatched_outlets = db.session.query(WarehouseTransaction.Wrhse_outlet_id).distinct().all()
+    dispatched_outlets = db.session.query(WarehouseTransaction.wrhse_outlet_id).distinct().all()
     outlet_ids = [id for (id,) in dispatched_outlets]
     outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
     all_outlets = [name for (name,) in outlet_names]
@@ -802,7 +802,7 @@ def get_daily_dispatch_vers_collection(outlet_name):
               WarehouseTransaction.transaction_type == 'dispatch'
           ).scalar() or 0
 
-      outlet_id = db.session.query(db.func.max(WarehouseTransaction.Wrhse_outlet_id))\
+      outlet_id = db.session.query(db.func.max(WarehouseTransaction.wrhse_outlet_id))\
           .filter(WarehouseTransaction.notes == outlet_name)\
           .scalar() or 0
 
@@ -882,7 +882,7 @@ def endday(Whrsh_Outlets_id):
 
     # 1st preserve record for the uncollected outlets
     outlet_uncollected_carry_forward = []
-    dispatched_outlets = db.session.query(WarehouseTransaction.Wrhse_outlet_id).distinct().all()
+    dispatched_outlets = db.session.query(WarehouseTransaction.wrhse_outlet_id).distinct().all()
     outlet_ids = [id for (id,) in dispatched_outlets]
     outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
     all_outlets = [name for (name,) in outlet_names]
@@ -897,7 +897,7 @@ def endday(Whrsh_Outlets_id):
 
         if v !=(d-c):
             new_warehouse_rcrd = WarehouseTransaction(
-                Wrhse_outlet_id=oid,
+                wrhse_outlet_id=oid,
                 good_crates=v,
                 worn_crates=0,
                 disposed_crates=0,
@@ -973,7 +973,7 @@ def endday_expired(Whrsh_Outlets_id):
 
     #1st preserve record for the uncollected outlets
     outlet_uncollected_carry_forward = []
-    dispatched_outlets = db.session.query(WarehouseTransaction.Wrhse_outlet_id).distinct().all()
+    dispatched_outlets = db.session.query(WarehouseTransaction.wrhse_outlet_id).distinct().all()
     outlet_ids = [id for (id,) in dispatched_outlets]
     outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
     all_outlets = [name for (name,) in outlet_names]
@@ -996,7 +996,7 @@ def endday_expired(Whrsh_Outlets_id):
         continue
 
       new_warehouse_rcrd = WarehouseTransaction(
-          Wrhse_outlet_id=oid,
+          wrhse_outlet_id=oid,
           good_crates=variance,
           worn_crates=0,
           disposed_crates=0,
@@ -1056,7 +1056,7 @@ def recent_wrhse_crates_stocktake_count():
 
   most_recent_stocktake = (
             WarehouseTransaction.query
-            .filter_by(transaction_type="stocktake", Wrhse_outlet_id=1)
+            .filter_by(transaction_type="stocktake", wrhse_outlet_id=1)
             .order_by(WarehouseTransaction.timestamp.desc())
             .first()
         )
@@ -1137,7 +1137,7 @@ def warehouse_stocktake(Whrsh_Outlets_id):
     #  ,total_crates=good_crates + worn_crates)
     
     txn = WarehouseTransaction(
-        Wrhse_outlet_id=warehouse_id,
+        wrhse_outlet_id=warehouse_id,
         good_crates=good_crates + worn_crates,
         worn_crates=worn_crates,
         disposed_crates=disposed_crates,
