@@ -448,7 +448,7 @@ def get_inventory(outlet_name):
     # Example query: total dispatched + collected for today
 
     #dispatched,collected,recurrent_balance,variance
-    d, c, rb, v ,oid,sn = get_daily_dispatch_vers_collection(outlet_name)
+    d, c, rb, v ,oid,sn,fd,nd = get_daily_dispatch_vers_collection(outlet_name)
 
     return {"dispatched": d, "collected": c, "recorded_by" :sn }
 
@@ -749,16 +749,17 @@ def dashboard():
     for outlet_name in all_outlets:
 
       #dispatched,collected,recurrent_balance,variance
-      d, c, rb, v ,oid,sn = get_daily_dispatch_vers_collection(outlet_name)
+      d, c, rb, v ,oid,sn ,fd,nd = get_daily_dispatch_vers_collection(outlet_name)
       collected = c
-      dispatched = d
-      
+      total_dispatched = d
       # Recurrent balance: all-time (no cutoff filter)
       recurrent_balance = rb
-
       variance = v
+      todays_dispatch = nd
+      uncollected_yesterday = fd
+
       color = "table-danger" if variance > 0 else "table-success"
-      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{dispatched}</td><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
+      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{uncollected_yesterday}</td><td>{todays_dispatch}</td><th>{total_dispatched}</th><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
 
     #print("Warehouse object:", warehouse)
     #print("Warehouse.id:", warehouse.id if warehouse else None)
@@ -778,7 +779,7 @@ def dashboard():
         app_auto_dispatches=total_dispatched
     )
 
-def get_daily_dispatch_vers_collection(outlet_name):
+def get_daily_dispatch_vers_collection_outdated(outlet_name):
     #for outlet_name in all_outlets:
       """
       Calculate collected and dispatched crates for a given outlet
@@ -799,6 +800,8 @@ def get_daily_dispatch_vers_collection(outlet_name):
             WarehouseTransaction.transaction_type == 'collection'
         )
       
+
+
       dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
         .filter(
             WarehouseTransaction.notes == outlet_name,
@@ -814,7 +817,7 @@ def get_daily_dispatch_vers_collection(outlet_name):
     
         # Order by timestamp descending to get the latest record
         last_staff_query = last_staff_query.order_by(WarehouseTransaction.timestamp.desc())
-        print("last_staff_query",last_staff_query)
+        #print("last_staff_query",last_staff_query)
 
 
       collected = collected_query.scalar() or 0
@@ -851,6 +854,98 @@ def get_daily_dispatch_vers_collection(outlet_name):
       print("dispathed" , dispatched,"collected",collected,"variance",variance,"Recorded",last_staff)
       return dispatched,collected,recurrent_balance,variance,outlet_id,last_staff
 
+def get_daily_dispatch_vers_collection(outlet_name):
+    #for outlet_name in all_outlets:
+      """
+      Calculate collected and dispatched crates for a given outlet
+      since the last end day cutoff.
+      """
+      last_end_day = get_last_end_day_date()
+
+      last_staff_query =db.session.query(WarehouseTransaction.staff_name)\
+        .filter(
+        WarehouseTransaction.notes == outlet_name,
+        WarehouseTransaction.transaction_type.in_(["collection", "dispatch"])
+        )
+
+
+      collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'collection'
+        )
+      
+
+      dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'dispatch'
+        )
+      today_forced_dispatched_query= db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'dispatch',
+            WarehouseTransaction.staff_name.like('System Auto%')   # forced/system entries
+        )
+
+      today_night_shift_dispatch_query= db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(
+            WarehouseTransaction.notes == outlet_name,
+            WarehouseTransaction.transaction_type == 'dispatch',
+            WarehouseTransaction.staff_name.notlike('System Auto%')  # human/night shift entries
+        )
+
+      # Apply cutoff if it exists
+      if last_end_day:
+        collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
+        dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
+        #print("dispatched_query",dispatched_query)
+        last_staff_query =last_staff_query.filter(WarehouseTransaction.timestamp > last_end_day)
+    
+        # Order by timestamp descending to get the latest record
+        last_staff_query = last_staff_query.order_by(WarehouseTransaction.timestamp.desc())
+        #print("last_staff_query",last_staff_query)
+
+        today_forced_dispatched_query = today_forced_dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+        today_night_shift_dispatch_query = today_night_shift_dispatch_query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+
+      collected = collected_query.scalar() or 0
+      dispatched = dispatched_query.scalar() or 0
+      #last_staff = last_staff_query.first()
+      # Fetch the first row
+      row = last_staff_query.first()
+      last_staff = row[0] if row else None
+      #last_staff = last_staff_query[0] if last_staff else None
+      print("last_staff",last_staff)
+      night_forced =today_forced_dispatched_query.scalar() or 0
+      night_dispatch =today_night_shift_dispatch_query.scalar() or 0
+
+      
+      # Recurrent balance: all-time (no cutoff filter)
+      recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+          .filter(
+              WarehouseTransaction.notes == outlet_name,
+              WarehouseTransaction.transaction_type == 'collection'
+          ).scalar() or 0
+
+      recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+          .filter(
+              WarehouseTransaction.notes == outlet_name,
+              WarehouseTransaction.transaction_type == 'dispatch'
+          ).scalar() or 0
+
+      outlet_id = db.session.query(db.func.max(WarehouseTransaction.wrhse_outlet_id))\
+          .filter(WarehouseTransaction.notes == outlet_name)\
+          .scalar() or 0
+
+
+      recurrent_balance = recurrent_dispatched - recurrent_collected
+
+      variance = dispatched - collected
+      print("dispathed" , dispatched,"collected",collected,"variance",variance,"Recorded",last_staff,"forced_dispatch",night_forced,"normal_dispatch",night_dispatch)
+      return dispatched,collected,recurrent_balance,variance,outlet_id,last_staff,night_forced,night_dispatch
 
 @app.route("/reconciliations/<int:offset>")
 def get_reconciliations(offset=0):
@@ -1167,7 +1262,7 @@ def endday_expired(whrsh_outlets_id):
     for outlet_name in all_outlets:
       print("outlets name to auto add",outlet_name)
       #dispatched,collected,recurrent_balance,variance
-      d, c, rb, v ,oid,sn= get_daily_dispatch_vers_collection(outlet_name)
+      d, c, rb, v ,oid,sn,nf,nd= get_daily_dispatch_vers_collection(outlet_name)
       collected = c
       dispatched = d
       

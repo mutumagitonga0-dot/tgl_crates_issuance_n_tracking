@@ -126,9 +126,13 @@ document.getElementById("outletSelect").addEventListener("change", function() {
             .then(data => {
                 let message = "";
                 if (processType === "dispatch") {
-                    message = `🚚 Dispatched today: ${data.dispatched}  Recorded by: ${data.recorded_by}`;
+                    message = `🚚 Total dispatched today: ${data.dispatched}  Recorded by: ${data.recorded_by}`;
                 } else if (processType === "collection") {
-                    message = `📦 Collected today: ${data.collected}  Recorded by: ${data.recorded_by}`;
+                    message = `📦 <span class= "highlight-label">
+              			{Expected Collection - ${data.dispatched}}
+          			 </span>
+           			{Total collected today: ${data.collected}  
+           			Recorded by: ${data.recorded_by}}`;
                 } else {
                     message = "No transaction data available.";
                 }
