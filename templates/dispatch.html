@@ -18,15 +18,21 @@
 
   <h2>Record Dispatch</h2>
 
-  <div class="mb-3">
-    <label class="form-label">Outlet</label>
-    <select name="outlet_name" class="form-select" required>
-      <option value="" selected>-- Select Outlet --</option>
-      {% for o in outlets %}
-        <option value="{{ o }}">{{ o }}</option>
-      {% endfor %}
-    </select>
-  </div>
+ 
+<div class="mb-3">
+  <label class="form-label">Outlet</label>
+  <select name="outlet_name" id="outletSelect" class="form-select" required>
+    <option value="" selected>-- Select Outlet --</option>
+    {% for o in outlets %}
+      <option value="{{ o }}">{{ o }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+<!-- Placeholder for inventory results -->
+<!--div id="inventoryResult" class="highlight-label"></div-->
+<div id="inventoryResult" class="highlight-label" data-process-type="dispatch"></div>
+
 
   <div class="mb-3">
     <label class="form-label">Crates Left here</label>

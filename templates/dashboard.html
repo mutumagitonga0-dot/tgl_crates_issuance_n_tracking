@@ -197,6 +197,9 @@
   </div>
 </div>
 
+<!--p>Debug: warehouse.id = {{ warehouse.id }}, warehouse.whrsh_outlets_id = {{ warehouse.whrsh_outlets_id }}</p-->
+
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const btn = document.querySelector('[data-bs-target="#reconciliationPanel"]');
@@ -283,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <div class="modal fade" id="endDayModal" tabindex="-1" aria-labelledby="endDayModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form id="endDayForm" method="POST" action="/warehouse/{{ warehouse.whrsh_outlet_id }}/endday">
+      <form id="endDayForm" method="POST" action="/warehouse/{{ warehouse.whrsh_outlets_id }}/endday">
         <div class="modal-header">
           <h5 class="modal-title" id="endDayModalLabel">
             End of Day Circle - {{ warehouse.name if warehouse else '' }}

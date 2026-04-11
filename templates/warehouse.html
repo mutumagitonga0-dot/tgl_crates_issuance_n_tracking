@@ -48,7 +48,9 @@
   <div class="modal fade" id="endDayModal" tabindex="-1" aria-labelledby="endDayModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
-        <form method="POST" action="/warehouse/{{ warehouse.Whrsh_Outlets_id if warehouse else 0 }}/endday">
+        <!--form method="POST" action="/warehouse/{{ warehouse.whrsh_outlets_id if warehouse else 0 }}/endday"-->
+	<form method="POST" action="/warehouse/{{ warehouse.whrsh_outlets_id }}/endday">
+
           <div class="modal-header">
             <h5 class="modal-title" id="endDayModalLabel">
               End of Day - {{ warehouse.name if warehouse else '' }}

@@ -20,7 +20,7 @@
 
   <div class="mb-3">
     <label class="form-label">Outlet</label>
-    <select name="outlet_name" class="form-select" required>
+    <select name="outlet_name" id="outletSelect" class="form-select" required>
       <option value="" selected>-- Select Outlet --</option>
       {% for o in outlets %}
         <option value="{{ o }}">{{ o }}</option>
@@ -28,10 +28,16 @@
     </select>
   </div>
 
+<!-- Placeholder for inventory results -->
+<!--div id="inventoryResult" class="highlight-label"></div-->
+<div id="inventoryResult" class="highlight-label" data-process-type="collection"></div>
+
+
   <div class="mb-3">
     <label class="form-label">Crates Collected Here</label>
     <input type="number" name="crates_collected" class="form-control" required>
   </div>
+
 
   <div class="mb-3">
     <label class="form-label">Collected By (Staff Name)</label>
@@ -42,6 +48,7 @@
       {% endfor %}
     </select>
   </div>
+
 
   <button type="submit" class="btn btn-primary" id="submitBtn">Submit Collection</button>
 </form>
