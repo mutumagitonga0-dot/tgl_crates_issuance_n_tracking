@@ -1,12 +1,10 @@
-from flask import Flask, request, render_template_string, redirect, url_for, flash, render_template, jsonify
-from flask_sqlalchemy import SQLAlchemy 
-from sqlalchemy import create_engine, text,cast,Date
-from flask_migrate import Migrate
-from datetime import datetime,timezone,date
 import os
-import uuid
-
-from sqlalchemy import func, case
+from datetime import datetime,timezone,date
+from flask import Flask, request, render_template_string, redirect, url_for, flash, render_template, jsonify,json
+from flask_sqlalchemy import SQLAlchemy 
+from sqlalchemy import create_engine, text,cast,Date,func,case
+from flask_migrate import Migrate
+#import uui
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
@@ -215,19 +213,19 @@ def home():
 
 
     total_collected_today = total_daily_crates_collected()
-    print("total_collected_today",  total_collected_today)
+    #print("total_collected_today",  total_collected_today)
     total_dispatched_today = total_daily_crates_dispatched()
-    print("total_dispatched_today",  total_dispatched_today)
+    #print("total_dispatched_today",  total_dispatched_today)
     recent_stcktake_crate = recent_wrhse_crates_stocktake_count()
-    print("recent_stcktake_crate",  recent_stcktake_crate)
+    #print("recent_stcktake_crate",  recent_stcktake_crate)
     total_available_for_use = recent_stcktake_crate - total_dispatched_today + total_collected_today
-    print("total_available_for_use",  total_available_for_use)
+    #print("total_available_for_use",  total_available_for_use)
     variance_today = total_collected_today - total_dispatched_today
-    print("variance_today",  variance_today)
+    #print("variance_today",  variance_today)
     denominator = recent_stcktake_crate
-    print("denominator",  denominator)
+    #print("denominator",  denominator)
     available_pct_today = (total_available_for_use / denominator * 100) if denominator > 0 else 0
-    print("available_pct_today",  available_pct_today)
+    #print("available_pct_today",  available_pct_today)
 
     # Instead of building HTML here, just pass the values to the template
     return render_template(
@@ -323,7 +321,7 @@ def populate_warehouses_with_active_outlets(created_outlets):
 def retrieve_offline_users():
   users = Users.query.all()  # returns list of User objects
   usernames = [u.staff_name for u in users]  # extract usernames
-  print("DEBUG: usernames =", usernames)
+  #print("DEBUG: usernames =", usernames)
   return usernames
 
 def add_purchase(warehouse_id, crates, description=""):
@@ -442,15 +440,62 @@ def record_collection():
     # Render template, passing outlets and users
     return render_template("collection.html", outlets=outlets, users=users)
 
-@app.route("/get_inventory/<outlet_name>")
-def get_inventory(outlet_name):
+@app.route("/get_inventory/<outlet>")
+def get_inventory(outlet):
     #from datetime import date
     # Example query: total dispatched + collected for today
 
     #dispatched,collected,recurrent_balance,variance
-    d, c, rb, v ,oid,sn,fd,nd = get_daily_dispatch_vers_collection(outlet_name)
+    d, c, rb, v ,oid,sn,fd,nd,thr_lt_d,thr_lt_c = get_daily_dispatch_vers_collection(outlet)
 
-    return {"dispatched": d, "collected": c, "recorded_by" :sn }
+
+    dispatched=d
+    collected=c
+    last_staff=sn
+    recurrent_balance=rb
+    variance=v
+    outlet_id=oid
+    night_forced=fd
+    night_dispatch=nd
+    thr_recent_dispatch=thr_lt_d
+    thr_recent_collection=thr_lt_c
+
+    print("DEBUG dispatched:", dispatched, type(dispatched))
+    print("DEBUG collected:", collected, type(collected))
+    print("DEBUG recorded_by:", last_staff, type(last_staff))
+    print("DEBUG recurrent_balance:", recurrent_balance, type(recurrent_balance))
+    print("DEBUG variance:", variance, type(variance))
+    print("DEBUG outlet_id:", outlet_id, type(outlet_id))
+    print("DEBUG night_forced:", night_forced, type(night_forced))
+    print("DEBUG night_dispatch:", night_dispatch, type(night_dispatch))
+    print("DEBUG thr_recent_dispatch:", thr_recent_dispatch, type(thr_recent_dispatch))
+    if thr_recent_dispatch:
+        print("DEBUG first dispatch entry:", thr_recent_dispatch[0], type(thr_recent_dispatch[0]))
+    print("DEBUG thr_recent_collection:", thr_recent_collection, type(thr_recent_collection))
+
+    outlet_id = str(outlet_id) if outlet_id is not None else None
+    night_forced = int(night_forced) if night_forced is not None else 0
+    night_dispatch = int(night_dispatch) if night_dispatch is not None else 0
+
+    # Ensure serialization
+    #thr_recent_dispatch = [serialize_txn(txn) for txn in thr_recent_dispatch]
+    #thr_recent_collection = [serialize_txn(txn) for txn in thr_recent_collection]
+
+    payload = {
+        "dispatched": dispatched,
+        "collected": collected,
+        "recorded_by": last_staff,
+        "recurrent_balance": recurrent_balance,
+        "variance": variance,
+        "outlet_id": outlet_id,
+        "night_forced": night_forced,
+        "night_dispatch": night_dispatch,
+        "thr_recent_dispatch": thr_recent_dispatch,
+        "thr_recent_collection": thr_recent_collection
+    }
+    #print("DEBUG JSON string:", json.dumps(payload, indent=2))
+    return jsonify(payload)
+    #return {"dispatched": d, "collected": c, "recorded_by" :sn,"recent_dispatches": thr_lt_d,"recent_collections" :thr_lt_c}
 
 
 #@app.route("/reconcile/<int:outlet_id>")
@@ -706,12 +751,12 @@ def dashboard():
         flash("Default warehouse created: Tgl Warehouse", "info")
 
 
-    total_collected = total_daily_crates_collected()
-    total_dispatched = total_daily_crates_dispatched()
+    total_collected_for_all = total_daily_crates_collected()
+    total_dispatched_for_all = total_daily_crates_dispatched()
     recent_stcktake_crate = recent_wrhse_crates_stocktake_count()
 
-    total_available = recent_stcktake_crate - total_dispatched + total_collected
-    variance = total_collected - total_dispatched
+    total_available = recent_stcktake_crate - total_dispatched_for_all + total_collected_for_all
+    variance = total_collected_for_all - total_dispatched_for_all
     denominator = recent_stcktake_crate
     available_pct = (total_available / denominator * 100) if denominator > 0 else 0
 
@@ -719,8 +764,8 @@ def dashboard():
         "name": warehouse.name,
         "last_stocktake": recent_stcktake_crate,
         "total_available": total_available,
-        "total_dispatched": total_dispatched,
-        "total_collected": total_collected,
+        "total_dispatched": total_dispatched_for_all,
+        "total_collected": total_collected_for_all,
         "variance": variance,
         "available_pct": round(available_pct, 2)
     }
@@ -749,7 +794,7 @@ def dashboard():
     for outlet_name in all_outlets:
 
       #dispatched,collected,recurrent_balance,variance
-      d, c, rb, v ,oid,sn ,fd,nd = get_daily_dispatch_vers_collection(outlet_name)
+      d, c, rb, v ,oid,sn ,fd,nd,thr_lt_d,thr_lt_c = get_daily_dispatch_vers_collection(outlet_name)
       collected = c
       total_dispatched = d
       # Recurrent balance: all-time (no cutoff filter)
@@ -775,177 +820,105 @@ def dashboard():
         users=users,
         last_rec=last_rec,
         reconciliations=reconciliations,
-        app_auto_collections=total_collected,
-        app_auto_dispatches=total_dispatched
+        app_auto_collections=total_collected_for_all,
+        app_auto_dispatches=total_dispatched_for_all
     )
 
-def get_daily_dispatch_vers_collection_outdated(outlet_name):
-    #for outlet_name in all_outlets:
-      """
-      Calculate collected and dispatched crates for a given outlet
-      since the last end day cutoff.
-      """
-      last_end_day = get_last_end_day_date()
-
-      last_staff_query =db.session.query(WarehouseTransaction.staff_name)\
-        .filter(
-        WarehouseTransaction.notes == outlet_name,
-        WarehouseTransaction.transaction_type.in_(["collection", "dispatch"])
-        )
-
-
-      collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'collection'
-        )
-      
-
-
-      dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'dispatch'
-        )
-
-      # Apply cutoff if it exists
-      if last_end_day:
-        collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
-        dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
-        #print("dispatched_query",dispatched_query)
-        last_staff_query =last_staff_query.filter(WarehouseTransaction.timestamp > last_end_day)
-    
-        # Order by timestamp descending to get the latest record
-        last_staff_query = last_staff_query.order_by(WarehouseTransaction.timestamp.desc())
-        #print("last_staff_query",last_staff_query)
-
-
-      collected = collected_query.scalar() or 0
-      dispatched = dispatched_query.scalar() or 0
-      #last_staff = last_staff_query.first()
-      # Fetch the first row
-      row = last_staff_query.first()
-      last_staff = row[0] if row else None
-      #last_staff = last_staff_query[0] if last_staff else None
-      print("last_staff",last_staff)
-
-      
-      # Recurrent balance: all-time (no cutoff filter)
-      recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-          .filter(
-              WarehouseTransaction.notes == outlet_name,
-              WarehouseTransaction.transaction_type == 'collection'
-          ).scalar() or 0
-
-      recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-          .filter(
-              WarehouseTransaction.notes == outlet_name,
-              WarehouseTransaction.transaction_type == 'dispatch'
-          ).scalar() or 0
-
-      outlet_id = db.session.query(db.func.max(WarehouseTransaction.wrhse_outlet_id))\
-          .filter(WarehouseTransaction.notes == outlet_name)\
-          .scalar() or 0
-
-
-      recurrent_balance = recurrent_dispatched - recurrent_collected
-
-      variance = dispatched - collected
-      print("dispathed" , dispatched,"collected",collected,"variance",variance,"Recorded",last_staff)
-      return dispatched,collected,recurrent_balance,variance,outlet_id,last_staff
-
 def get_daily_dispatch_vers_collection(outlet_name):
-    #for outlet_name in all_outlets:
-      """
-      Calculate collected and dispatched crates for a given outlet
-      since the last end day cutoff.
-      """
-      last_end_day = get_last_end_day_date()
+    """
+    Calculate collected and dispatched crates for a given outlet
+    since the last end day cutoff, plus recent records.
+    """
+    last_end_day = get_last_end_day_date()
 
-      last_staff_query =db.session.query(WarehouseTransaction.staff_name)\
+    # Base queries
+    last_staff_query =db.session.query(WarehouseTransaction.staff_name)\
         .filter(
         WarehouseTransaction.notes == outlet_name,
         WarehouseTransaction.transaction_type.in_(["collection", "dispatch"])
         )
+    
+    collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'collection')
 
+    dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch')
 
-      collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'collection'
-        )
-      
+    today_forced_dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch',
+                WarehouseTransaction.staff_name.like('System Auto%'))
 
-      dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'dispatch'
-        )
-      today_forced_dispatched_query= db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'dispatch',
-            WarehouseTransaction.staff_name.like('System Auto%')   # forced/system entries
-        )
+    today_night_shift_dispatch_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch',
+                WarehouseTransaction.staff_name.notlike('System Auto%'))
 
-      today_night_shift_dispatch_query= db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'dispatch',
-            WarehouseTransaction.staff_name.notlike('System Auto%')  # human/night shift entries
-        )
-
-      # Apply cutoff if it exists
-      if last_end_day:
+    # Apply cutoff if it exists
+    if last_end_day:
         collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
         dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
-        #print("dispatched_query",dispatched_query)
-        last_staff_query =last_staff_query.filter(WarehouseTransaction.timestamp > last_end_day)
-    
-        # Order by timestamp descending to get the latest record
-        last_staff_query = last_staff_query.order_by(WarehouseTransaction.timestamp.desc())
-        #print("last_staff_query",last_staff_query)
-
         today_forced_dispatched_query = today_forced_dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
-
         today_night_shift_dispatch_query = today_night_shift_dispatch_query.filter(WarehouseTransaction.timestamp > last_end_day)
+        last_staff_query =last_staff_query.filter(WarehouseTransaction.timestamp > last_end_day)
+        
+        # Recent dispatches (limit 5)
+        thr_recent_dispatch = db.session.query(WarehouseTransaction)\
+            .filter(WarehouseTransaction.notes == outlet_name,
+                    WarehouseTransaction.transaction_type == 'dispatch',
+                    WarehouseTransaction.timestamp > last_end_day)\
+            .order_by(WarehouseTransaction.timestamp.desc())\
+            .limit(3).all() #truck normally visit maximum of 2 per outlets
 
+        # Recent collections (limit 5)
+        thr_recent_collection = db.session.query(WarehouseTransaction)\
+            .filter(WarehouseTransaction.notes == outlet_name,
+                    WarehouseTransaction.transaction_type == 'collection',
+                    WarehouseTransaction.timestamp > last_end_day)\
+            .order_by(WarehouseTransaction.timestamp.desc())\
+            .limit(3).all() #truck normally visit maximum of 2 per outlets
+    else:
+        thr_recent_dispatch = []
+        thr_recent_collection = []
 
-      collected = collected_query.scalar() or 0
-      dispatched = dispatched_query.scalar() or 0
-      #last_staff = last_staff_query.first()
-      # Fetch the first row
-      row = last_staff_query.first()
-      last_staff = row[0] if row else None
-      #last_staff = last_staff_query[0] if last_staff else None
-      print("last_staff",last_staff)
-      night_forced =today_forced_dispatched_query.scalar() or 0
-      night_dispatch =today_night_shift_dispatch_query.scalar() or 0
+    # Convert to list of dicts
+    thr_recent_dispatch = [serialize_txn(txn) for txn in thr_recent_dispatch]
+    thr_recent_collection = [serialize_txn(txn) for txn in thr_recent_collection]
+    #print(thr_recent_dispatch)
+    # Scalars
+    collected = collected_query.scalar() or 0
+    dispatched = dispatched_query.scalar() or 0
+    night_forced = today_forced_dispatched_query.scalar() or 0
+    night_dispatch = today_night_shift_dispatch_query.scalar() or 0
+    # Fetch the first row
+    row = last_staff_query.first()
+    last_staff = row[0] if row else None
 
-      
-      # Recurrent balance: all-time (no cutoff filter)
-      recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-          .filter(
-              WarehouseTransaction.notes == outlet_name,
-              WarehouseTransaction.transaction_type == 'collection'
-          ).scalar() or 0
+    recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'collection').scalar() or 0
 
-      recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-          .filter(
-              WarehouseTransaction.notes == outlet_name,
-              WarehouseTransaction.transaction_type == 'dispatch'
-          ).scalar() or 0
+    recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
+        .filter(WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch').scalar() or 0
 
-      outlet_id = db.session.query(db.func.max(WarehouseTransaction.wrhse_outlet_id))\
-          .filter(WarehouseTransaction.notes == outlet_name)\
-          .scalar() or 0
+    outlet_id = db.session.query(db.func.max(WarehouseTransaction.wrhse_outlet_id))\
+        .filter(WarehouseTransaction.notes == outlet_name).scalar() or 0
 
+    recurrent_balance = recurrent_dispatched - recurrent_collected
+    variance = dispatched - collected
 
-      recurrent_balance = recurrent_dispatched - recurrent_collected
+    #print("dispathed" , dispatched,"collected",collected,"variance",variance,"Recorded",last_staff,"forced_dispatch",night_forced,"normal_dispatch",night_dispatch,"thr_recent_dispatch",thr_recent_dispatch,"thr_recent_collection",thr_recent_collection)
+    return dispatched,collected,recurrent_balance,variance,outlet_id,last_staff,night_forced,night_dispatch,thr_recent_dispatch,thr_recent_collection
 
-      variance = dispatched - collected
-      print("dispathed" , dispatched,"collected",collected,"variance",variance,"Recorded",last_staff,"forced_dispatch",night_forced,"normal_dispatch",night_dispatch)
-      return dispatched,collected,recurrent_balance,variance,outlet_id,last_staff,night_forced,night_dispatch
+def serialize_txn(txn):
+    return {
+        "timestamp": txn.timestamp.strftime("%Y-%m-%d %H:%M:%S") if txn.timestamp else None,
+        "good_crates": txn.good_crates,
+        "staff_name": txn.staff_name
+    }
 
 @app.route("/reconciliations/<int:offset>")
 def get_reconciliations(offset=0):
@@ -974,7 +947,6 @@ def get_reconciliations(offset=0):
     return {"reconciliations": data}
 
 @app.route("/warehouse/<int:id>/endday", methods=["POST"])
-#@app.route("/warehouse/<int:whrsh_outlets_id>/endday", methods=["POST"])  #whrsh_outlets_id
 def endday(id): #whrsh_outlets_id
     warehouse = Warehouse.query.filter_by(id=id).first_or_404() 
 
@@ -1212,103 +1184,6 @@ def export_summary_to_pdf(summary):
     c.save()
     print(f"Summary PDF generated: {filename}")
 
-@app.route("/Expire_Dwarehouse/<int:whrsh_outlets_id>/endday", methods=["POST"])
-def endday_expired(whrsh_outlets_id):
-    warehouse = Warehouse.query.filter_by(whrsh_outlets_id=whrsh_outlets_id).first_or_404()
-    
-    dispatched_crates = request.form.get("app_dispatched")
-    physical_crates = request.form.get("physical_crates")
-    app_collections = request.form.get("app_collections")
-    variance = request.form.get("variance")
-    staff_name = request.form.get("staff_name")
-    remarks = request.form.get("remarks")
-    overwrite = request.form.get("overwrite")
-
-    last_log = (
-    EndDayLog.query
-    .filter(cast(EndDayLog.created_at, Date) == date.today())
-    .order_by(EndDayLog.created_at.desc())
-    .first()
-    )
-
-    if last_log and not overwrite:
-        new_values = {
-            "dispatched_crates":dispatched_crates,
-            "physical_crates": physical_crates,
-            "app_collections": app_collections,
-            "variance": variance,
-            "staff_name": staff_name,
-            "remarks": remarks
-        }
-        return jsonify({
-            "status": "exists",
-            "last_log": {
-                "physical_crates": last_log.physical_crates,
-                "app_collections": last_log.app_collections,
-                "variance": last_log.variance,
-                "staff_name": last_log.staff_name,
-                "remarks": last_log.remarks
-            },
-            "new_values": new_values
-        })
-
-    #1st preserve record for the uncollected outlets
-    outlet_uncollected_carry_forward = []
-    dispatched_outlets = db.session.query(WarehouseTransaction.wrhse_outlet_id).distinct().all()
-    outlet_ids = [id for (id,) in dispatched_outlets]
-    outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
-    all_outlets = [name for (name,) in outlet_names]
-
-    for outlet_name in all_outlets:
-      print("outlets name to auto add",outlet_name)
-      #dispatched,collected,recurrent_balance,variance
-      d, c, rb, v ,oid,sn,nf,nd= get_daily_dispatch_vers_collection(outlet_name)
-      collected = c
-      dispatched = d
-      
-      # Recurrent balance: all-time (no cutoff filter)
-      recurrent_balance = rb
-
-      variance = v
-      print(variance)
-      #if variance >= 1:
-      # Skip this outlet if variance <= 0
-      if variance <= 0:
-        continue
-
-      new_warehouse_rcrd = WarehouseTransaction(
-          wrhse_outlet_id=oid,
-          good_crates=variance,
-          worn_crates=0,
-          disposed_crates=0,
-          transaction_type="dispatch",
-          notes=outlet_name,
-          staff_name="Admin"
-      )
-      outlet_uncollected_carry_forward.append(new_warehouse_rcrd)
-
-        
-
-    # Insert or overwrite
-    new_log = EndDayLog(
-        warehouse_id=warehouse.whrsh_outlets_id,   # <-- critical fix
-        dispatched_crates=dispatched_crates,
-        physical_crates=physical_crates,
-        app_collections=app_collections,
-        variance=variance,
-        staff_name=staff_name,
-        remarks=remarks
-    )
-    db.session.add(new_log)
-    db.session.commit()
-    
-    for i in outlet_uncollected_carry_forward:
-    
-      db.session.add(i)
-      db.session.commit()
-
-    return jsonify({"status": "updated", "message": "End of Day recorded successfully"})
-
 @app.route("/app_auto_collections")
 def get_app_collections():
     # Example: calculate from EndDayLog or Warehouse
@@ -1344,9 +1219,9 @@ def recent_wrhse_crates_stocktake_count():
 
   if most_recent_stocktake:
       recent_stcktake_crate = most_recent_stocktake.good_crates
-      print("Most recent stocktake good_crates for outlet 1001 =", recent_stcktake_crate)
-  else:
-      print("No stocktake transactions found for outlet 1001.")
+      #print("Most recent stocktake good_crates for outlet 1001 =", recent_stcktake_crate)
+  #else:
+  #    print("No stocktake transactions found for outlet 1001.")
   return recent_stcktake_crate       
 
 def validate_staff_selection(field_name="staff_name"):
