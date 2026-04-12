@@ -460,18 +460,18 @@ def get_inventory(outlet):
     thr_recent_dispatch=thr_lt_d
     thr_recent_collection=thr_lt_c
 
-    print("DEBUG dispatched:", dispatched, type(dispatched))
-    print("DEBUG collected:", collected, type(collected))
-    print("DEBUG recorded_by:", last_staff, type(last_staff))
-    print("DEBUG recurrent_balance:", recurrent_balance, type(recurrent_balance))
-    print("DEBUG variance:", variance, type(variance))
-    print("DEBUG outlet_id:", outlet_id, type(outlet_id))
-    print("DEBUG night_forced:", night_forced, type(night_forced))
-    print("DEBUG night_dispatch:", night_dispatch, type(night_dispatch))
-    print("DEBUG thr_recent_dispatch:", thr_recent_dispatch, type(thr_recent_dispatch))
-    if thr_recent_dispatch:
-        print("DEBUG first dispatch entry:", thr_recent_dispatch[0], type(thr_recent_dispatch[0]))
-    print("DEBUG thr_recent_collection:", thr_recent_collection, type(thr_recent_collection))
+    #print("DEBUG dispatched:", dispatched, type(dispatched))
+    #print("DEBUG collected:", collected, type(collected))
+    #print("DEBUG recorded_by:", last_staff, type(last_staff))
+    #print("DEBUG recurrent_balance:", recurrent_balance, type(recurrent_balance))
+    #print("DEBUG variance:", variance, type(variance))
+    #print("DEBUG outlet_id:", outlet_id, type(outlet_id))
+    #print("DEBUG night_forced:", night_forced, type(night_forced))
+    #print("DEBUG night_dispatch:", night_dispatch, type(night_dispatch))
+    #print("DEBUG thr_recent_dispatch:", thr_recent_dispatch, type(thr_recent_dispatch))
+    #if thr_recent_dispatch:
+    #    print("DEBUG first dispatch entry:", thr_recent_dispatch[0], type(thr_recent_dispatch[0]))
+    #print("DEBUG thr_recent_collection:", thr_recent_collection, type(thr_recent_collection))
 
     outlet_id = str(outlet_id) if outlet_id is not None else None
     night_forced = int(night_forced) if night_forced is not None else 0

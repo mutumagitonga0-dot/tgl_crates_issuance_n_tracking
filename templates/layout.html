@@ -114,14 +114,14 @@ fetch(this.action, {
 function buildMessage(data, processType) {
   let message = "";
   if (processType === "dispatch") {
-    message = `{🚚 Total dispatched today: ${data.dispatched}}
-               {By: ${data.recorded_by}}`;
+    message = `{🚚 Total dispatched today: ${data.dispatched}}`;
+         
   } else if (processType === "collection") {
     message = `📦 <span class="highlight-label">
                 {Expected Collection - ${data.dispatched}}
               </span>
-              {Total collected today: ${data.collected} }
-              By: ${data.recorded_by}`;
+              {Total collected today: ${data.collected} }`;
+              
   } else {
     message = "No transaction data available.";
   }
