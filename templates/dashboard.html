@@ -304,8 +304,18 @@ document.addEventListener('DOMContentLoaded', function () {
           <input type="number" id="physical_crates" name="physical_crates" min="0" class="form-control text-center" required>
 
           <label for="app_collections" class="mt-2">App Collection Recordings</label>
-          <input type="number" id="app_collections" name="app_collections" min="0" class="form-control text-center readonly-highlight"
-                 value="{{ app_auto_collections }}" readonly>
+          <div class="position-relative">
+  <input type="number" id="app_collections" name="app_collections" min="0"
+         class="form-control text-center readonly-highlight pe-4"
+         value="{{ app_auto_collections }}" readonly>
+  <!-- Lens icon overlay -->
+  <span id="viewCollectionsBtn"
+        class="position-absolute top-50 end-0 translate-middle-y me-2"
+        style="cursor:pointer;">
+    🔍
+  </span>
+</div>
+
 
           <label for="variance" class="mt-2">Variance</label>
           <input type="number" id="variance" name="variance" class="form-control readonly-highlight fw-bold text-center" readonly>
@@ -319,7 +329,7 @@ document.addEventListener('DOMContentLoaded', function () {
           </select>
 
           <label for="remarks" class="mt-2">Remarks</label>
-          <textarea name="remarks" rows="3" class="form-control"></textarea>
+          <textarea name="remarks" rows="2" class="form-control"></textarea>
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-success">Submit End of Day</button>
@@ -381,7 +391,6 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
   </div>
 </div>
-
 
 <script>
 document.getElementById("endDayForm").addEventListener("submit", function(e) {

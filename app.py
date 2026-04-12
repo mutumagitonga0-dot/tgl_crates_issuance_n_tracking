@@ -377,6 +377,22 @@ def record_dispatch():
             flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
             return redirect(request.url)
 
+        # Define what makes a record "duplicate"
+        existing = db.session.query(WarehouseTransaction).filter_by(
+            wrhse_outlet_id=warehouse_id,
+            good_crates=good_crates,
+            worn_crates=0,
+            disposed_crates=0,
+            transaction_type="dispatch",
+            notes=branchname,
+            #staff_name=staff_name
+        ).first()
+
+        if existing:
+            # Duplicate found – discard and alert user
+            flash("⚠️ Duplicate dispatch record detected. Transaction discarded.", "warning")
+            return redirect(request.url)
+
         new_warehouse_rcrd = WarehouseTransaction(
             wrhse_outlet_id=warehouse_id,
             good_crates=good_crates,
@@ -386,6 +402,7 @@ def record_dispatch():
             notes=branchname,
             staff_name=staff_name
         )
+       
         db.session.add(new_warehouse_rcrd)
         db.session.commit()
 
@@ -422,6 +439,22 @@ def record_collection():
             flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
             return redirect(request.url)
 
+        # Define what makes a record "duplicate"
+        existing = db.session.query(WarehouseTransaction).filter_by(
+            wrhse_outlet_id=warehouse_id,
+            good_crates=good_crates,
+            worn_crates=0,
+            disposed_crates=0,
+            transaction_type="collection",
+            notes=branchname,
+            #staff_name=staff_name
+        ).first()
+
+        if existing:
+            # Duplicate found – discard and alert user
+            flash("⚠️ Duplicate collection record detected. Transaction discarded.", "warning")
+            return redirect(request.url)
+        
         new_warehouse_rcrd = WarehouseTransaction(
             wrhse_outlet_id=warehouse_id,
             good_crates=good_crates,
@@ -446,7 +479,7 @@ def get_inventory(outlet):
     # Example query: total dispatched + collected for today
 
     #dispatched,collected,recurrent_balance,variance
-    d, c, rb, v ,oid,sn,fd,nd,thr_lt_d,thr_lt_c = get_daily_dispatch_vers_collection(outlet)
+    d, c, rb, v ,oid,sn,fd,nd,thr_lt_d,thr_lt_c,outlts_summ = get_daily_dispatch_vers_collection(outlet)
 
 
     dispatched=d
@@ -794,7 +827,7 @@ def dashboard():
     for outlet_name in all_outlets:
 
       #dispatched,collected,recurrent_balance,variance
-      d, c, rb, v ,oid,sn ,fd,nd,thr_lt_d,thr_lt_c = get_daily_dispatch_vers_collection(outlet_name)
+      d, c, rb, v ,oid,sn ,fd,nd,thr_lt_d,thr_lt_c,outlts_summ = get_daily_dispatch_vers_collection(outlet_name)
       collected = c
       total_dispatched = d
       # Recurrent balance: all-time (no cutoff filter)
@@ -823,6 +856,41 @@ def dashboard():
         app_auto_collections=total_collected_for_all,
         app_auto_dispatches=total_dispatched_for_all
     )
+
+def get_all_outlets_collections_summary():
+    """
+    Loop through all outlets with collections > 0 since last cutoff
+    and return their dispatch/collection summaries.
+    """
+    last_end_day = get_last_end_day_date()
+
+    # Find all outlet names that had collections > 0 today
+    outlets_with_collections = db.session.query(WarehouseTransaction.notes)\
+        .filter(WarehouseTransaction.transaction_type == 'collection')
+
+    if last_end_day:
+        outlets_with_collections = outlets_with_collections.filter(WarehouseTransaction.timestamp > last_end_day)
+
+    # Group by outlet name and only keep those with sum > 0
+    outlets_with_collections = outlets_with_collections.group_by(WarehouseTransaction.notes)\
+        .having(db.func.sum(WarehouseTransaction.good_crates) > 0).all()
+
+    # Loop through each outlet and channel through your existing function
+    summaries = []
+    for outlet_row in outlets_with_collections:
+        outlet_name = outlet_row[0]  # notes column
+        data = get_daily_dispatch_vers_collection(outlet_name)
+        summaries.append({
+            "outlet_name": outlet_name,
+            "summary": data
+        })
+
+    return summaries
+
+@app.route("/get_user_collections_summary")
+def get_user_collections_summary():
+    summaries = get_all_outlets_collections_summary()
+    return jsonify(summaries)
 
 def get_daily_dispatch_vers_collection(outlet_name):
     """
@@ -910,8 +978,14 @@ def get_daily_dispatch_vers_collection(outlet_name):
     recurrent_balance = recurrent_dispatched - recurrent_collected
     variance = dispatched - collected
 
+    # Build user collections summary
+    user_collections_summary = {
+        "user": last_staff,
+        "total": collected,
+        "collections": thr_recent_collection
+    }
     #print("dispathed" , dispatched,"collected",collected,"variance",variance,"Recorded",last_staff,"forced_dispatch",night_forced,"normal_dispatch",night_dispatch,"thr_recent_dispatch",thr_recent_dispatch,"thr_recent_collection",thr_recent_collection)
-    return dispatched,collected,recurrent_balance,variance,outlet_id,last_staff,night_forced,night_dispatch,thr_recent_dispatch,thr_recent_collection
+    return dispatched,collected,recurrent_balance,variance,outlet_id,last_staff,night_forced,night_dispatch,thr_recent_dispatch,thr_recent_collection,user_collections_summary
 
 def serialize_txn(txn):
     return {
