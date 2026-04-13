@@ -378,15 +378,34 @@ def record_dispatch():
             return redirect(request.url)
 
         # Define what makes a record "duplicate"
-        existing = db.session.query(WarehouseTransaction).filter_by(
+        #existing_query = db.session.query(WarehouseTransaction).filter_by(
+        #    wrhse_outlet_id=warehouse_id,
+        #    good_crates=good_crates,
+        #    worn_crates=0,
+        #    disposed_crates=0,
+        #    transaction_type="dispatch",
+        #    notes=branchname,
+        #    #staff_name=staff_name
+        #).first()
+
+        last_end_day = get_last_end_day_date()
+        # Build the query
+        query = db.session.query(WarehouseTransaction).filter_by(
             wrhse_outlet_id=warehouse_id,
             good_crates=good_crates,
             worn_crates=0,
             disposed_crates=0,
             transaction_type="dispatch",
             notes=branchname,
-            #staff_name=staff_name
-        ).first()
+            staff_name=staff_name
+        )
+
+        # Apply cutoff if needed
+        if last_end_day:
+            query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+        # Execute
+        existing = query.first()
 
         if existing:
             # Duplicate found – discard and alert user
@@ -440,15 +459,34 @@ def record_collection():
             return redirect(request.url)
 
         # Define what makes a record "duplicate"
-        existing = db.session.query(WarehouseTransaction).filter_by(
+        #existing = db.session.query(WarehouseTransaction).filter_by(
+        #    wrhse_outlet_id=warehouse_id,
+        #    good_crates=good_crates,
+        #    worn_crates=0,
+        #    disposed_crates=0,
+        #    transaction_type="collection",
+        #    notes=branchname,
+        #    #staff_name=staff_name
+        #).first()
+
+        last_end_day = get_last_end_day_date()
+        # Build the query
+        query = db.session.query(WarehouseTransaction).filter_by(
             wrhse_outlet_id=warehouse_id,
             good_crates=good_crates,
             worn_crates=0,
             disposed_crates=0,
             transaction_type="collection",
             notes=branchname,
-            #staff_name=staff_name
-        ).first()
+            staff_name=staff_name
+        )
+
+        # Apply cutoff if needed
+        if last_end_day:
+            query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+        # Execute
+        existing = query.first()
 
         if existing:
             # Duplicate found – discard and alert user
