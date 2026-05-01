@@ -2,18 +2,28 @@
 {% block title %}Record Collection{% endblock %}
 
 {% block content %}
+
+
+<style>
+  body {
+  
+/*background-color: #f28b82; /* soft red */
+  /* or try one of these for soft blue tones */
+  /* background-color: #add8e6;  light blue */
+   background-color: #87cefa;  sky blue 
+  /* background-color: #b0e0e6;  powder blue */
+  }
+</style>
+
 <form method="post" class="card p-3"
-      onsubmit="if (!confirm('Do you want to proceed collecting ' 
+      onsubmit="return confirmAndBusy(this,'Do you want to proceed collecting ' 
       + document.querySelector('[name=crates_collected]').value 
       + ' crates from outlet ' 
       + document.querySelector('[name=outlet_name]').value 
       + ' by staff ' 
-      + document.querySelector('[name=staff_name]').value + '?')) {
-          document.querySelector('[name=cancelled]').value = 'true';
-          return false; // stop submission if cancelled
-      }
-      document.getElementById('submitBtn').disabled = true; 
-      return true;">
+      + document.querySelector('[name=staff_name]').value + '?',
+      'submitBtn');">
+   
   <input type="hidden" name="cancelled" value="false">
 
   <h2>Record Collection</h2>
@@ -39,7 +49,7 @@
   </div>
 
 
-  <div class="mb-3">
+  <!--div class="mb-3">
     <label class="form-label">Collected By (Staff Name)</label>
     <select name="staff_name" class="form-select" required>
       <option value="" selected>-- Select Staff --</option>
@@ -47,7 +57,7 @@
         <option value="{{ u }}">{{ u }}</option>
       {% endfor %}
     </select>
-  </div>
+  </div-->
 
 
   <button type="submit" class="btn btn-primary" id="submitBtn">Submit Collection</button>

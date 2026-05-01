@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block title %}Welcome - Login{% endblock %}
+
+{% block content %}
+<style>
+  body {
+    background: linear-gradient(135deg, #f28b82, #ffe0e0); /* soft red gradient */
+    font-family: "Segoe UI", sans-serif;
+  }
+  .login-card {
+    max-width: 400px;
+    margin: 80px auto;
+    padding: 30px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    text-align: center;
+  }
+  .login-card h2 {
+    margin-bottom: 20px;
+    color: #333;
+  }
+  .login-card input {
+    margin-bottom: 15px;
+  }
+  .welcome-graphic {
+    width: 100px;
+    margin-bottom: 20px;
+  }
+</style>
+
+
+<h2 class="text-center text- green mt-4">Welcome to TGL Crates Monitoring System</h2>
+
+<div class="homepage-banner">
+  <img src="{{ url_for('static', filename='images/warehouse_monitoring.png') }}" 
+       alt="Warehouse Monitoring" class="bg-image">
+
+  <div class="overlay">
+    <form method="POST" action="{{ url_for('login') }}" class="login-form">
+      <input type="text" name="username" class="form-control mb-3" placeholder="Enter Username" required>
+      <input type="password" name="password" class="form-control mb-3" placeholder="Enter Password" required>
+      <button type="submit" class="btn btn-danger w-100">Login</button>
+      <p class="mt-3">
+        <a href="{{ url_for('forgot_password') }}" class="text-blue">Forgot your password?</a>
+      </p>
+    </form>
+  </div>
+</div>
+
+
+{% endblock %}

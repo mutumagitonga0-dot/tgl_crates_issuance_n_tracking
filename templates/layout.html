@@ -48,6 +48,45 @@
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; /* clean font */
 }
 
+.homepage-banner {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.bg-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(70%);
+}
+
+.overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  width: 350px;
+  text-align: center;
+}
+
+.login-form input {
+  margin-bottom: 15px;
+}
+
+.login-form a {
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.login-form a:hover {
+  text-decoration: underline;
+}
+
 
 fetch(this.action, {
   method: "POST",
@@ -76,6 +115,7 @@ fetch(this.action, {
 <body>
 
 <!-- Navigation Bar -->
+{% if current_user.is_authenticated %}
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
   <div class="container-fluid">
     <a class="navbar-brand fw-bold text-primary" href="{{ url_for('home') }}">📦Tunda Green Ltd Crate Tracker</a>
@@ -89,11 +129,12 @@ fetch(this.action, {
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'record_dispatch' %}active{% endif %}" href="{{ url_for('record_dispatch') }}">Dispatch</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'record_collection' %}active{% endif %}" href="{{ url_for('record_collection') }}">Collection</a></li>
         <li class="nav-item"><a class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}" href="{{ url_for('manage_users') }}">Manage Users</a></li>
+	<li class="nav-item"><a class="nav-link {% if request.endpoint == 'logout' %}active{% endif %}" href="{{ url_for('logout') }}">Logout</a></li>
       </ul>
     </div>
   </div>
 </nav>
-
+{% endif %}
 
 <div class="container mt-4">
   {% with messages = get_flashed_messages(with_categories=true) %}
@@ -109,6 +150,45 @@ fetch(this.action, {
 
   {% block content %}{% endblock %}
 </div>
+
+<script>
+// Auto-dismiss alerts after 5 seconds
+document.addEventListener("DOMContentLoaded", function() {
+  const alerts = document.querySelectorAll('.alert');
+  alerts.forEach(function(alert) {
+    setTimeout(() => {
+      // Use Bootstrap's built-in dismiss
+      const bsAlert = new bootstrap.Alert(alert);
+      bsAlert.close();
+    }, 3000); // 3000ms = 3 seconds
+  });
+});
+</script>
+
+
+
+<script>
+// Global helper for confirmation + busy cursor
+function confirmAndBusy(form, message, btnId) {
+  if (!confirm(message)) {
+    form.querySelector('[name=cancelled]').value = 'true';
+    return false; // stop submission if cancelled
+  }
+  // Set busy cursor and disable button
+  document.body.style.cursor = 'wait';
+  const btn = document.getElementById(btnId);
+  if (btn) btn.disabled = true;
+  return true; // allow form submission
+}
+
+// Reset cursor when page reloads
+window.addEventListener("load", function() {
+  document.body.style.cursor = "default";
+  const btn = document.getElementById("submitBtn");
+  if (btn) btn.disabled = false;
+});
+</script>
+
 
 <script>
 function buildMessage(data, processType) {

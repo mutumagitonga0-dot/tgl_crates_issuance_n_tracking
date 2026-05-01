@@ -1,6 +1,8 @@
 import os
 from datetime import datetime,timezone,date
 from flask import Flask, request, render_template_string, redirect, url_for, flash, render_template, jsonify,json
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy 
 from sqlalchemy import create_engine, text,cast,Date,func,case
 from flask_migrate import Migrate
@@ -9,10 +11,17 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 
+
 #from flask import Flask, render_template, request, redirect, url_for, flash
 #from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
 #from werkzeug.security import check_password_hash
 
+#from flask import Blueprint, jsonify, request
+#from sqlalchemy import func
+#from yourapp.models import WarehouseTransactions, User, Branch
+#from yourapp.extensions import db
+
+#bp = Blueprint("warehouse", __name__)
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key"  # required for flash/session
@@ -69,11 +78,18 @@ class Outlet(db.Model):
     outlet_id = db.Column(db.Integer, nullable=False, unique=True)
     name = db.Column(db.String(255), nullable=False)
 
+#class Users(db.Model):
+#    __tablename__ = 'users'
+#    id = db.Column(db.Integer, primary_key=True)
+#    staff_name = db.Column(db.String(100), unique=True, nullable=False)
 
-class Users(db.Model):
+class Users(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     staff_name = db.Column(db.String(100), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    status = db.Column(db.Integer, nullable=False)    
 
 
 class Warehouse(db.Model):
@@ -125,11 +141,62 @@ class EndDayLog(db.Model):
 
     #warehouse = db.relationship("Warehouse", backref="end_day_logs")
 
+# Secure one-time init route
+# Example to create all tables manually: http://127.0.0.1:10000/init-db?token=changeme
+@app.route("/init-db")
+def init_db():
+    token = request.args.get("token")
+    if token != INIT_SECRET:
+        return "Unauthorized", 403
+
+    with app.app_context():
+        # Ensure tables exist
+        db.create_all()
+
+        from sqlalchemy import text
+        try:
+            # Add username column with default if missing
+            db.session.execute(text("""
+                IF NOT EXISTS (
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'username'
+                )
+                ALTER TABLE users ADD username NVARCHAR(80)
+                CONSTRAINT DF_users_username DEFAULT 'tempuser' NOT NULL;
+            """))
+
+            # Add password_hash column with default if missing
+            db.session.execute(text("""
+                IF NOT EXISTS (
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'password_hash'
+                )
+                ALTER TABLE users ADD password_hash NVARCHAR(200)
+                CONSTRAINT DF_users_password_hash DEFAULT 'changeme' NOT NULL;
+            """))
+
+            # Add status column with default if missing
+            db.session.execute(text("""
+                IF NOT EXISTS (
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'status'
+                )
+                ALTER TABLE users ADD status INT
+                CONSTRAINT DF_users_status DEFAULT 1 NOT NULL;
+            """))
+
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return f"Error altering table: {e}", 500
+
+    return "Tables created and altered successfully!"
+
 
 # Secure one-time init route
 #http://127.0.0.1:10000/init-db?token=changeme #to create all tables manually
-@app.route("/init-db")
-def init_db():
+#@app.route("/init-db")
+def outdated_init_db():
   token = request.args.get("token")
   if token != INIT_SECRET:
       return "Unauthorized", 403
@@ -138,9 +205,15 @@ def init_db():
       db.create_all()
   return "Tables created successfully!"
 
+def run_enviroment_for_app_debbug():
+    #1.cd C:\Users\Admin\crate-tracker\backend_for_web
+    #2.venv\Scripts\Activate.ps1
+    #3.python app.py or your app.py_name run
+    print("terminal_process")
+
 def push_to_github():
-   #Nb.you should be here
-   #(venv) PS C:\Users\Admin\crate-tracker\backend_for_web>
+    #Nb.you should be here
+    #(venv) PS C:\Users\Admin\crate-tracker\backend_for_web>
 
     # 1. Initialize Git in your project folder (only once)
     #git init
@@ -155,7 +228,7 @@ def push_to_github():
     #git add .
 
     # 4. Commit your changes with a message
-    #git commit -m "Initial commit or update backend code"
+    #git commit -m "Initial commit or update backend code" 
 
     # 5. Push to GitHub
     # First push (sets branch name and upstream)
@@ -167,8 +240,9 @@ def push_to_github():
     #git add .
     #git commit -m "Describe your changes here"
     #git push
+    print("github_process")
 
-    import subprocess
+#import subprocess
 
 def connect_sqlalchemy_database_through_cmd():
     # Path to your psql.exe
@@ -178,7 +252,22 @@ def connect_sqlalchemy_database_through_cmd():
     conn_str = "postgresql://tgl_crates_db_user:Vk1PPiktlT6aktTgzdCCNkQZZFfLeiX5@dpg-d6uodkchg0os73f4kql0-a.oregon-postgres.render.com/tgl_crates_db"
     
     # Run the command
-    subprocess.run([psql_path, conn_str])
+
+
+    #if this error : ERROR:  character with byte sequence 0xe2 0x80 0x91 in encoding "UTF8" has no equivalent in encoding "WIN1252"
+    #run this line \encoding UTF8
+    
+    # run this \x 
+    # This shows each row with column names and values vertically. 
+
+    #run \pset tuples_only off
+    #That command tells psql to include column headers. If tuples_only is set to on, headers are hidden.
+
+    #run  \x auto
+    #This will switch between table and expanded view depending on row width, always showing headers.
+    
+    
+    #subprocess.run([psql_path, conn_str])
 
 
 @app.route("/github_instructions")
@@ -186,7 +275,76 @@ def github_instructions():
     return f"<pre>{github_upload_instructions()}</pre>"
 
 ## --- Routes ---
-@app.route("/")
+#@app.route("/", methods=["GET", "POST"])
+#def login():
+#    if request.method == "POST":
+#        username = request.form["username"]
+#        password = request.form["password"]
+#        # Replace with proper authentication logic
+#        if username == "admin" and password == "secret":
+#            #return redirect(url_for("dashboard"))
+#            return redirect(url_for("home"))
+#        else:
+#            flash("Invalid credentials, please try again.", "danger")
+#    return render_template("login.html")
+
+def update_user_password(username: str, plain_password: str) -> bool:
+    """
+    Hashes a plain password and updates the given user's record.
+    Returns True if successful, False if user not found.
+    """
+    user = Users.query.filter_by(username=username).first()
+    if not user:
+        return False
+    
+    user.password_hash = generate_password_hash(plain_password)
+    db.session.commit()
+    return True
+
+@app.route("/", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        print(username,password)
+        user = Users.query.filter_by(username=username).first()
+        print(user)
+
+        # Update Admin user
+        #success = update_user_password("tempuser", "changeme")
+        #if success:
+        #    print("Password updated and hashed successfully.")
+        #else:
+        #    print("User not found.")
+        
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for("dashboard"))
+        else:
+            flash("Invalid credentials, please try again.", "danger")
+
+    return render_template("login.html")
+
+@app.route("/logout")
+@login_required
+def logout():
+    # End the user session
+    logout_user()
+    flash("You have been logged out successfully.", "info")
+    return redirect(url_for("login"))
+
+from flask_login import LoginManager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Users.query.get(int(user_id))
+
+#@app.route("/")
+
+@app.route("/home", methods=["GET", "POST"])
 def home():
     outlets = Outlet.query.all()
 
@@ -372,7 +530,8 @@ def record_dispatch():
         except (TypeError, ValueError):
             good_crates = 0
 
-        staff_name = request.form.get("staff_name") or ""
+        #staff_name = request.form.get("staff_name") or ""
+        staff_name = current_user.staff_name  
         if good_crates <= 0 or not staff_name:
             flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
             return redirect(request.url)
@@ -453,7 +612,8 @@ def record_collection():
         except (TypeError, ValueError):
             good_crates = 0
 
-        staff_name = request.form.get("staff_name") or ""
+        #staff_name = request.form.get("staff_name") or ""
+        staff_name = current_user.staff_name  
         if good_crates <= 0 or not staff_name:
             flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
             return redirect(request.url)
@@ -511,6 +671,41 @@ def record_collection():
     # Render template, passing outlets and users
     return render_template("collection.html", outlets=outlets, users=users)
 
+
+from itsdangerous import URLSafeTimedSerializer
+serializer = URLSafeTimedSerializer(app.secret_key)
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        username = request.form["username"]
+        user = Users.query.filter_by(username=username).first()
+        if user:
+            token = serializer.dumps(user.id, salt="password-reset")
+            reset_url = url_for("reset_password", token=token, _external=True)
+            # TODO: send reset_url via email (Flask-Mail or SMTP)
+            flash("Password reset link has been sent to your email.", "info")
+        else:
+            flash("User not found.", "danger")
+    return render_template("forgot_password.html")
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    try:
+        user_id = serializer.loads(token, salt="password-reset", max_age=3600)
+    except Exception:
+        flash("Invalid or expired reset link.", "danger")
+        return redirect(url_for("login"))
+
+    user = Users.query.get(user_id)
+    if request.method == "POST":
+        new_password = request.form["password"]
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        flash("Password updated successfully. Please log in.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html")
+
 @app.route("/get_inventory/<outlet>")
 def get_inventory(outlet):
     #from datetime import date
@@ -567,6 +762,138 @@ def get_inventory(outlet):
     #print("DEBUG JSON string:", json.dumps(payload, indent=2))
     return jsonify(payload)
     #return {"dispatched": d, "collected": c, "recorded_by" :sn,"recent_dispatches": thr_lt_d,"recent_collections" :thr_lt_c}
+
+@app.route("/delete_warehouse/<int:warehouse_id>/collections_summary")
+def delete_collections_summary(warehouse_id):
+    last_end_day = get_last_end_day_date()
+
+    
+    WarehouseTransaction.timestamp > last_end_day
+    # Aggregate total collections per user for this warehouse
+    summary = (
+        db.session.query(
+            Users.id.label("user_id"),
+            Users.staff_name.label("user"),
+            func.sum(WarehouseTransaction.good_crates).label("total_collections")
+        )
+        .join(Users, Users.staff_name == WarehouseTransaction.staff_name)
+        .filter(WarehouseTransaction.wrhse_outlet_id == warehouse_id)
+        .group_by(Users.id, Users.staff_name)
+        .all()
+    )
+
+    data = []
+    for row in summary:
+        # Branch breakdown for this user
+        branch_data = (
+            db.session.query(
+                Outlet.name.label("branch"),
+                func.sum(WarehouseTransaction.good_crates).label("collections"),
+                func.sum(WarehouseTransaction.good_crates).label("dispatches")
+            )
+            .join(Outlet, Outlet.id == WarehouseTransaction.wrhse_outlet_id)
+            .filter(
+                WarehouseTransaction.wrhse_outlet_id == warehouse_id,
+                WarehouseTransaction.staff_name == row.user
+            )
+            .group_by(Outlet.name)
+            .all()
+        )
+
+        data.append({
+            "user": row.user,
+            "total_collections": row.total_collections or 0,
+            "branches": [
+                {"branch": b.branch, "collections": b.collections or 0, "dispatches": b.dispatches or 0}
+                for b in branch_data
+            ]
+        })
+
+    return jsonify(data)
+
+@app.route("/warehouse/<int:warehouse_id>/collections_summary")
+def collections_summary(warehouse_id):
+    last_end_day = get_last_end_day_date()
+    print(last_end_day)
+    # Base query for per-user totals
+    summary_query = (
+        db.session.query(
+        WarehouseTransaction.staff_name.label("staff_name"),
+        func.sum(
+            case(
+                (WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates),
+                else_=0
+            )
+        ).label("total_dispatches"),
+        func.sum(
+            case(
+                (WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates),
+                else_=0
+            )
+        ).label("total_collections"))
+     #.filter(WarehouseTransaction.wrhse_outlet_id == warehouse_id)
+        .group_by(WarehouseTransaction.staff_name)
+    )
+    print(summary_query)
+
+
+    # Apply cutoff if available
+    if last_end_day:
+        summary_query = summary_query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+    summary = summary_query.all()
+    print(summary)
+
+    data = []
+    for row in summary:
+        # Branch breakdown for this user
+        branch_query = (
+            db.session.query(
+                WarehouseTransaction.notes.label("branch"),
+                func.sum(
+                case(
+                (WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates),
+                else_=0
+                )).label("collections"),
+                #func.sum(WarehouseTransaction.good_crates).label("collections")\
+                #.filter(WarehouseTransaction.transaction_type == 'collection'),
+                func.sum(
+                case(
+                (WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates),
+                else_=0
+                )).label("dispatches"))
+                #func.sum(WarehouseTransaction.good_crates).label("dispatches")\
+                #.filter(WarehouseTransaction.transaction_type == 'dispatch')
+            
+            #.join(Outlet, Outlet.id == WarehouseTransaction.wrhse_outlet_id)
+                .filter(
+                #WarehouseTransaction.wrhse_outlet_id,
+                #== warehouse_id,
+                WarehouseTransaction.staff_name == row.staff_name
+                )
+                .group_by(WarehouseTransaction.notes)
+        )
+
+        if last_end_day:
+            branch_query = branch_query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+        branch_data = branch_query.all()
+
+        data.append({
+            "user": row.staff_name,
+            "total_collections": row.total_collections or 0,
+            "total_dispatches": row.total_dispatches or 0,
+            "branches": [
+                {
+                    "branch": b.branch,
+                    "collections": b.collections or 0,
+                    "dispatches": b.dispatches or 0
+                }
+                for b in branch_data
+            ]
+        })
+        print(data)
+    return jsonify(data)
 
 
 #@app.route("/reconcile/<int:outlet_id>")
@@ -643,166 +970,8 @@ def total_daily_crates_collected():
     return total_collected
 
 
-@app.route("/dashboard_main")
-def dashboard_main():
-    # Ensure at least one warehouse exists
-    warehouse = Warehouse.query.first()
-    if not warehouse:
-        warehouse = Warehouse(
-            name="Tgl Warehouse",
-            whrsh_outlets_id=1,
-            good_crates=0,
-            worn_crates=0,
-            disposed_crates=0,
-            dispatched_crates=0,
-            collected_crates=0,
-            total_crates=0
-        )
-        db.session.add(warehouse)
-        db.session.commit()
-        flash("Default warehouse created: Tgl Warehouse", "info")
-
-    # Outlets with transactions
-    dispatched_outlets = db.session.query(WarehouseTransaction.wrhse_outlet_id).distinct().all()
-    outlet_ids = [id for (id,) in dispatched_outlets]
-    outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
-    all_outlets = [name for (name,) in outlet_names]
-
-    # Build outlet stats
-    outlet_stats = []
-    for outlet_name in all_outlets:
-        last_end_day = get_last_end_day_date()
-
-        collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-            .filter(WarehouseTransaction.notes == outlet_name,
-                    WarehouseTransaction.transaction_type == 'collection')
-        dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-            .filter(WarehouseTransaction.notes == outlet_name,
-                    WarehouseTransaction.transaction_type == 'dispatch')
-
-        if last_end_day:
-            collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
-            dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
-
-        collected = collected_query.scalar() or 0
-        dispatched = dispatched_query.scalar() or 0
-
-        recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-            .filter(WarehouseTransaction.notes == outlet_name,
-                    WarehouseTransaction.transaction_type == 'collection').scalar() or 0
-        recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-            .filter(WarehouseTransaction.notes == outlet_name,
-                    WarehouseTransaction.transaction_type == 'dispatch').scalar() or 0
-
-        recurrent_balance = recurrent_dispatched - recurrent_collected
-        variance = dispatched - collected
-        color = "table-danger" if variance > 0 else "table-success"
-
-        outlet_stats.append({
-            "name": outlet_name,
-            "recurrent_balance": recurrent_balance,
-            "dispatched": dispatched,
-            "collected": collected,
-            "variance": variance,
-            "color": color
-        })
-
-    total_collected = total_daily_crates_collected()
-    total_dispatched = total_daily_crates_dispatched()
-    recent_stcktake_crate = recent_wrhse_crates_stocktake_count()
-
-    total_available = recent_stcktake_crate - total_dispatched + total_collected
-    variance = total_collected - total_dispatched
-    denominator = recent_stcktake_crate
-    available_pct = (total_available / denominator * 100) if denominator > 0 else 0
-
-    warehouse_summary = {
-        "name": warehouse.name,
-        "last_stocktake": recent_stcktake_crate,
-        "total_available": total_available,
-        "total_dispatched": total_dispatched,
-        "total_collected": total_collected,
-        "variance": variance,
-        "available_pct": round(available_pct, 2)
-    }
-
-    users = retrieve_offline_users()
-    last_rec = EndDayLog.query.order_by(EndDayLog.created_at.desc()).first()
-    reconciliations = EndDayLog.query.order_by(EndDayLog.created_at.desc()).limit(20).all()
-
-    most_recent_stocktake = WarehouseTransaction.query\
-        .filter_by(transaction_type="stocktake", wrhse_outlet_id=1)\
-        .order_by(WarehouseTransaction.timestamp.desc()).first()
-
-    if most_recent_stocktake:
-        last_stocktake_time = most_recent_stocktake.timestamp.strftime("%d %B %Y")
-        warehouse_summary_text = f"Warehouse Summary Based On : Last Stocktake : <span style='color:blue;'>{last_stocktake_time}</span>"
-    else:
-        warehouse_summary_text = "<span style='color:red;'>Warehouse Summary : No stocktake transactions found</span>"
-
-    rows = ""
-    for outlet_name in all_outlets:
-      """
-      Calculate collected and dispatched crates for a given outlet
-      since the last end day cutoff.
-      """
-      last_end_day = get_last_end_day_date()
-
-      collected_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'collection'
-        )
-      
-      dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-        .filter(
-            WarehouseTransaction.notes == outlet_name,
-            WarehouseTransaction.transaction_type == 'dispatch'
-        )
-
-      # Apply cutoff if it exists
-      if last_end_day:
-        collected_query = collected_query.filter(WarehouseTransaction.timestamp > last_end_day)
-        dispatched_query = dispatched_query.filter(WarehouseTransaction.timestamp > last_end_day)
-
-      collected = collected_query.scalar() or 0
-      dispatched = dispatched_query.scalar() or 0
-      
-      # Recurrent balance: all-time (no cutoff filter)
-      recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-          .filter(
-              WarehouseTransaction.notes == outlet_name,
-              WarehouseTransaction.transaction_type == 'collection'
-          ).scalar() or 0
-
-      recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
-          .filter(
-              WarehouseTransaction.notes == outlet_name,
-              WarehouseTransaction.transaction_type == 'dispatch'
-          ).scalar() or 0
-
-      recurrent_balance = recurrent_dispatched - recurrent_collected
-
-      variance = dispatched - collected
-      color = "table-danger" if variance > 0 else "table-success"
-      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{dispatched}</td><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
-
-
-    return render_template(
-        "dashboard.html",
-        warehouse=warehouse,
-        rows=rows,
-        warehouse_summary=warehouse_summary,
-        warehouse_summary_text=warehouse_summary_text,
-        outlet_stats=outlet_stats,
-        users=users,
-        last_rec=last_rec,
-        reconciliations=reconciliations,
-        app_auto_collections=total_collected,
-        app_auto_dispatches=total_dispatched
-    )
-
 @app.route("/dashboard")
+@login_required
 def dashboard():
     # Ensure at least one warehouse exists
     warehouse = Warehouse.query.first()
@@ -1431,11 +1600,81 @@ def manage_users():
 
         if action == "create":
             name = request.form.get("name")
+            plain_password = request.form.get("password")  # new field from form
+            existing_user = Users.query.filter_by(staff_name=name).first()
+
+            if existing_user:
+                create_message = f"User '{name}' already exists!"
+            else:
+                # Hash the admin-provided password
+                hashed_pw = generate_password_hash(plain_password)
+
+                new_user = Users(
+                    staff_name=name,
+                    username=name,  # you can adjust if you want username separate
+                    password_hash=hashed_pw,
+                    status=1
+                )
+                db.session.add(new_user)
+                db.session.commit()
+                create_message = f"User '{name}' added successfully with initial password!"
+
+        elif action == "update":
+            user_id = request.form.get("username")
+            new_name = request.form.get("new_name")
+            if not new_name:
+                update_message = "New name is required."
+            else:
+                user = Users.query.get(user_id)
+                if user:
+                    oldname = user.staff_name
+                    user.staff_name = new_name
+                    db.session.commit()
+                    update_message = f"User '{oldname}' updated to '{new_name}' successfully!"
+                else:
+                    update_message = "User not found."
+
+        elif action == "delete":
+            user_id = request.form.get("del_username")
+            user = Users.query.get(user_id)
+            if user:
+                db.session.delete(user)
+                db.session.commit()
+                delete_message = f"User '{user.staff_name}' deleted successfully!"
+            else:
+                delete_message = "User not found."
+
+    users = Users.query.all()
+
+    return render_template(
+        "manage_users.html",
+        users=users,
+        create_message=create_message,
+        update_message=update_message,
+        delete_message=delete_message
+    )
+
+@app.route("/outdated_manage_users", methods=["GET", "POST"])
+def outdated_manage_users():
+    create_message = ""
+    update_message = ""
+    delete_message = ""
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "create":
+            name = request.form.get("name")
             existing_user = Users.query.filter_by(staff_name=name).first()
             if existing_user:
                 create_message = f"User '{name}' already exists!"
             else:
-                new_user = Users(staff_name=name)
+                #new_user = Users(staff_name=name)
+                new_user = Users(
+                staff_name=name,
+                username=name,
+                password_hash=generate_password_hash("secret123")
+                )
                 db.session.add(new_user)
                 db.session.commit()
                 create_message = f"User '{name}' added successfully!"

@@ -2,44 +2,45 @@
 {% block title %}Record Dispatch{% endblock %}
 
 {% block content %}
+
+<style>
+  body {
+    //background-color: red;
+   background-color: #f28b82; /* soft red */
+  }
+</style>
+
 <form method="post" class="card p-3"
-      onsubmit="if (!confirm('Do you want to proceed dispatching ' 
-      + document.querySelector('[name=crates_sent]').value 
-      + ' crates to outlet ' 
-      + document.querySelector('[name=outlet_name]').value 
-      + ' by staff ' 
-      + document.querySelector('[name=staff_name]').value + '?')) {
-          document.querySelector('[name=cancelled]').value = 'true';
-          return false; // stop submission if cancelled
-      }
-      document.getElementById('submitBtn').disabled = true; 
-      return true;">
+      onsubmit="return confirmAndBusy(this,
+        'Do you want to proceed dispatching ' 
+        + document.querySelector('[name=crates_sent]').value 
+        + ' crates to outlet ' 
+        + document.querySelector('[name=outlet_name]').value 
+        + ' by staff ' 
+        + document.querySelector('[name=staff_name]').value + '?',
+        'submitBtn');">
   <input type="hidden" name="cancelled" value="false">
 
   <h2>Record Dispatch</h2>
 
- 
-<div class="mb-3">
-  <label class="form-label">Outlet</label>
-  <select name="outlet_name" id="outletSelect" class="form-select" required>
-    <option value="" selected>-- Select Outlet --</option>
-    {% for o in outlets %}
-      <option value="{{ o }}">{{ o }}</option>
-    {% endfor %}
-  </select>
-</div>
+  <div class="mb-3">
+    <label class="form-label">Outlet</label>
+    <select name="outlet_name" id="outletSelect" class="form-select" required>
+      <option value="" selected>-- Select Outlet --</option>
+      {% for o in outlets %}
+        <option value="{{ o }}">{{ o }}</option>
+      {% endfor %}
+    </select>
+  </div>
 
-<!-- Placeholder for inventory results -->
-<!--div id="inventoryResult" class="highlight-label"></div-->
-<div id="inventoryResult" class="highlight-label" data-process-type="dispatch"></div>
-
+  <div id="inventoryResult" class="highlight-label" data-process-type="dispatch"></div>
 
   <div class="mb-3">
     <label class="form-label">Crates Left here</label>
     <input type="number" name="crates_sent" class="form-control" required>
   </div>
 
-  <div class="mb-3">
+  <!--div class="mb-3">
     <label class="form-label">Incharge (Staff Name)</label>
     <select name="staff_name" class="form-select" required>
       <option value="" selected>-- Select Staff --</option>
@@ -47,7 +48,7 @@
         <option value="{{ u }}">{{ u }}</option>
       {% endfor %}
     </select>
-  </div>
+  </div-->
 
   <button type="submit" class="btn btn-primary" id="submitBtn">Submit Dispatch</button>
 </form>
@@ -68,8 +69,7 @@
   </div>
 </div>
 
-
-
 <a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a>
-{% endblock %}
 
+
+{% endblock %}
