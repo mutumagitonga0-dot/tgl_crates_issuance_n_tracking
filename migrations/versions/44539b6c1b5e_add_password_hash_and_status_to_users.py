@@ -16,19 +16,12 @@ branch_labels = None
 depends_on = None
 
 
+def upgrade():
+    op.add_column('users', sa.Column('username', sa.String(length=80), nullable=False))
+    op.add_column('users', sa.Column('password_hash', sa.String(length=200), nullable=False))
+    op.add_column('users', sa.Column('status', sa.Integer(), nullable=False))
+
 def downgrade():
+    op.drop_column('users', 'username')
     op.drop_column('users', 'password_hash')
     op.drop_column('users', 'status')
-
-def upgrade():
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
-
-    columns = [col['name'] for col in inspector.get_columns('users')]
-
-    if 'password_hash' not in columns:
-        op.add_column('users', sa.Column('password_hash', sa.String(length=200), nullable=False))
-
-    if 'status' not in columns:
-        op.add_column('users', sa.Column('status', sa.Integer(), nullable=False))
-
