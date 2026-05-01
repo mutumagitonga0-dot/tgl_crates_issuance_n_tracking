@@ -20,6 +20,7 @@ from reportlab.lib.units import inch
 #from sqlalchemy import func
 #from yourapp.models import WarehouseTransactions, User, Branch
 #from yourapp.extensions import db
+#import subprocess
 
 #bp = Blueprint("warehouse", __name__)
 
@@ -77,11 +78,6 @@ class Outlet(db.Model):
     id = db.Column(db.Integer, primary_key=True)   # internal PK
     outlet_id = db.Column(db.Integer, nullable=False, unique=True)
     name = db.Column(db.String(255), nullable=False)
-
-#class Users(db.Model):
-#    __tablename__ = 'users'
-#    id = db.Column(db.Integer, primary_key=True)
-#    staff_name = db.Column(db.String(100), unique=True, nullable=False)
 
 class Users(db.Model, UserMixin):
     __tablename__ = 'users'
@@ -192,19 +188,6 @@ def init_db():
 
     return "Tables created and altered successfully!"
 
-
-# Secure one-time init route
-#http://127.0.0.1:10000/init-db?token=changeme #to create all tables manually
-#@app.route("/init-db")
-def outdated_init_db():
-  token = request.args.get("token")
-  if token != INIT_SECRET:
-      return "Unauthorized", 403
-
-  with app.app_context():
-      db.create_all()
-  return "Tables created successfully!"
-
 def run_enviroment_for_app_debbug():
     #1.cd C:\Users\Admin\crate-tracker\backend_for_web
     #2.venv\Scripts\Activate.ps1
@@ -241,8 +224,6 @@ def push_to_github():
     #git commit -m "Describe your changes here"
     #git push
     print("github_process")
-
-#import subprocess
 
 def connect_sqlalchemy_database_through_cmd():
     # Path to your psql.exe
@@ -321,6 +302,7 @@ def login():
             login_user(user)
             return redirect(url_for("dashboard"))
         else:
+            #print(generate_password_hash("1234"))
             flash("Invalid credentials, please try again.", "danger")
 
     return render_template("login.html")
@@ -341,8 +323,6 @@ login_manager.login_view = "login"
 @login_manager.user_loader
 def load_user(user_id):
     return Users.query.get(int(user_id))
-
-#@app.route("/")
 
 @app.route("/home", methods=["GET", "POST"])
 def home():
@@ -763,53 +743,6 @@ def get_inventory(outlet):
     return jsonify(payload)
     #return {"dispatched": d, "collected": c, "recorded_by" :sn,"recent_dispatches": thr_lt_d,"recent_collections" :thr_lt_c}
 
-@app.route("/delete_warehouse/<int:warehouse_id>/collections_summary")
-def delete_collections_summary(warehouse_id):
-    last_end_day = get_last_end_day_date()
-
-    
-    WarehouseTransaction.timestamp > last_end_day
-    # Aggregate total collections per user for this warehouse
-    summary = (
-        db.session.query(
-            Users.id.label("user_id"),
-            Users.staff_name.label("user"),
-            func.sum(WarehouseTransaction.good_crates).label("total_collections")
-        )
-        .join(Users, Users.staff_name == WarehouseTransaction.staff_name)
-        .filter(WarehouseTransaction.wrhse_outlet_id == warehouse_id)
-        .group_by(Users.id, Users.staff_name)
-        .all()
-    )
-
-    data = []
-    for row in summary:
-        # Branch breakdown for this user
-        branch_data = (
-            db.session.query(
-                Outlet.name.label("branch"),
-                func.sum(WarehouseTransaction.good_crates).label("collections"),
-                func.sum(WarehouseTransaction.good_crates).label("dispatches")
-            )
-            .join(Outlet, Outlet.id == WarehouseTransaction.wrhse_outlet_id)
-            .filter(
-                WarehouseTransaction.wrhse_outlet_id == warehouse_id,
-                WarehouseTransaction.staff_name == row.user
-            )
-            .group_by(Outlet.name)
-            .all()
-        )
-
-        data.append({
-            "user": row.user,
-            "total_collections": row.total_collections or 0,
-            "branches": [
-                {"branch": b.branch, "collections": b.collections or 0, "dispatches": b.dispatches or 0}
-                for b in branch_data
-            ]
-        })
-
-    return jsonify(data)
 
 @app.route("/warehouse/<int:warehouse_id>/collections_summary")
 def collections_summary(warehouse_id):
@@ -894,7 +827,6 @@ def collections_summary(warehouse_id):
         })
         print(data)
     return jsonify(data)
-
 
 #@app.route("/reconcile/<int:outlet_id>")
 @app.route("/reconcile/<outlet_name>")
@@ -1267,38 +1199,6 @@ def endday(id): #whrsh_outlets_id
             "new_values": new_values
         })
 
-    # 1st preserve record for the uncollected outlets
-    #outlet_uncollected_carry_forward = []
-    #dispatched_outlets = db.session.query(WarehouseTransaction.wrhse_outlet_id).distinct().all()
-    #outlet_ids = [id for (id,) in dispatched_outlets]
-    #outlet_names = db.session.query(Outlet.name).filter(Outlet.outlet_id.in_(outlet_ids)).all()
-    #all_outlets = [name for (name,) in outlet_names]
-
-    #for outlet_name in all_outlets:
-    #    print("outlets name to auto add", outlet_name)
-    #    d, c, rb, v, oid ,sn = get_daily_dispatch_vers_collection(outlet_name)#
-
-    #    if v <= 0: 
-          #and v != (d - c):
-    #      continue
-
-    #    if v !=(d-c):
-    #        new_warehouse_rcrd = WarehouseTransaction(
-    #            wrhse_outlet_id=oid,
-    #            good_crates=v,
-    #            worn_crates=0,
-    #            disposed_crates=0,
-    #            transaction_type="dispatch",
-    #            notes=outlet_name,
-    #            staff_name="Admin"
-    #        )
-    #        outlet_uncollected_carry_forward.append(new_warehouse_rcrd)
-    #        continue
-    #    if v==(d-c): 
-    #        #if no collection has been done on that branch,then update date to the next day
-    #       
-    #        continue
-
     # Insert or overwrite whrsh_outlets_id 
     new_log = EndDayLog(
        warehouse_id=warehouse.whrsh_outlets_id,
@@ -1618,66 +1518,6 @@ def manage_users():
                 db.session.add(new_user)
                 db.session.commit()
                 create_message = f"User '{name}' added successfully with initial password!"
-
-        elif action == "update":
-            user_id = request.form.get("username")
-            new_name = request.form.get("new_name")
-            if not new_name:
-                update_message = "New name is required."
-            else:
-                user = Users.query.get(user_id)
-                if user:
-                    oldname = user.staff_name
-                    user.staff_name = new_name
-                    db.session.commit()
-                    update_message = f"User '{oldname}' updated to '{new_name}' successfully!"
-                else:
-                    update_message = "User not found."
-
-        elif action == "delete":
-            user_id = request.form.get("del_username")
-            user = Users.query.get(user_id)
-            if user:
-                db.session.delete(user)
-                db.session.commit()
-                delete_message = f"User '{user.staff_name}' deleted successfully!"
-            else:
-                delete_message = "User not found."
-
-    users = Users.query.all()
-
-    return render_template(
-        "manage_users.html",
-        users=users,
-        create_message=create_message,
-        update_message=update_message,
-        delete_message=delete_message
-    )
-
-@app.route("/outdated_manage_users", methods=["GET", "POST"])
-def outdated_manage_users():
-    create_message = ""
-    update_message = ""
-    delete_message = ""
-
-    if request.method == "POST":
-        action = request.form.get("action")
-
-        if action == "create":
-            name = request.form.get("name")
-            existing_user = Users.query.filter_by(staff_name=name).first()
-            if existing_user:
-                create_message = f"User '{name}' already exists!"
-            else:
-                #new_user = Users(staff_name=name)
-                new_user = Users(
-                staff_name=name,
-                username=name,
-                password_hash=generate_password_hash("secret123")
-                )
-                db.session.add(new_user)
-                db.session.commit()
-                create_message = f"User '{name}' added successfully!"
 
         elif action == "update":
             user_id = request.form.get("username")

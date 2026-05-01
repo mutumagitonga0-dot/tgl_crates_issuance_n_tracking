@@ -396,13 +396,18 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 
-
 <!-- Modal -->
 <div class="modal fade" id="collectionsModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
+<div id="reportContainer">
       <div class="modal-header">
-        <h5 class="modal-title">Collections Summary</h5>
+        <!--h5 class="modal-title">Collections Summary</h5-->
+	<h5 class="modal-title">
+    	Collections Summary for 
+    	<input type="text" id="summaryDate" class="form-control d-inline-block w-auto ms-2" />
+  	</h5>
+ 	<button id="printBtn" class="btn btn-sm btn-primary ms-3">Print</button>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="collections_summary">
@@ -411,6 +416,111 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
   </div>
 </div>
+</div>
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Default date
+  const today = new Date();
+  const options = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
+  document.getElementById("summaryDate").value = today.toLocaleDateString('en-US', options);
+
+  // Print button logic
+  document.getElementById("printBtn").addEventListener("click", function() {
+    // Expand all collapses
+    document.querySelectorAll(".collapse").forEach(c => c.classList.add("show"));
+
+    // Select the full report container (header + summary)
+    const element = document.getElementById("reportContainer");
+
+    if (!element || element.innerHTML.trim() === "") {
+      alert("No report data available to export.");
+      return;
+    }
+
+    // Show busy cursor
+    document.body.style.cursor = "wait";
+
+    // Hide print button temporarily
+    const printBtn = document.getElementById("printBtn");
+    printBtn.style.display = "none";
+
+    // Configure PDF options
+    const opt = {
+      margin:       0.5,
+      filename:     `Collections_Summary_${document.getElementById("summaryDate").value}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+
+    // Delay slightly to ensure DOM is painted
+    setTimeout(() => {
+      html2pdf().set(opt).from(element).save().then(() => {
+        // Restore cursor and button
+        document.body.style.cursor = "default";
+        printBtn.style.display = "inline-block";
+        alert("PDF has been saved. You can now print it if you wish.");
+      }).catch(err => {
+        document.body.style.cursor = "default";
+        printBtn.style.display = "inline-block";
+        console.error("Error generating PDF:", err);
+        alert("Failed to generate PDF.");
+      });
+    }, 500);
+  });
+});
+</script>
+
+
+<style>
+@media print {
+  /* Hide modal chrome and buttons */
+  .modal-header .btn,
+  .modal-footer,
+  .btn-close {
+    display: none !important;
+  }
+
+  /* Remove modal background and borders */
+  .modal-content {
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .modal-dialog {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  /* Force A4 page size */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  /* Page breaks between users for clarity */
+  .card {
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+  }
+
+  /* Tables print cleanly */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid #000;
+    padding: 4px;
+    text-align: left;
+  }
+}
+</style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
@@ -435,12 +545,33 @@ document.addEventListener("DOMContentLoaded", function() {
                 ${user.user} — Total Collections: ${user.total_collections} | Total Dispatches: ${user.total_dispatches}
               </div>
               <div id="${collapseId}" class="collapse">
-                <ul class="list-group list-group-flush">
-                  ${user.branches.map(b => `
-                    <li class="list-group-item">
-                      Branch: ${b.branch} | Collections: ${b.collections} | Dispatches: ${b.dispatches}
-                    </li>`).join("")}
-                </ul>
+                <div class="card-body p-0">
+                  <table class="table table-sm table-striped mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th scope="col">Branch</th>
+                        <th scope="col">Collections</th>
+                        <th scope="col">Dispatches</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${user.branches.map(b => `
+                        <tr>
+                          <td>${b.branch}</td>
+                          <td>${b.collections}</td>
+                          <td>${b.dispatches}</td>
+                        </tr>
+                      `).join("")}
+                    </tbody>
+                    <tfoot>
+                      <tr class="fw-bold">
+                        <td>Total</td>
+                        <td>${user.total_collections}</td>
+                        <td>${user.total_dispatches}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             </div>
           `;
@@ -453,10 +584,6 @@ document.addEventListener("DOMContentLoaded", function() {
   });
 });
 </script>
-
-
-
-
 
 <script>
 //end of user options
@@ -628,8 +755,6 @@ document.getElementById("toggle-history").addEventListener("click", function() {
   }
 });
 </script>
-
-
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
