@@ -763,7 +763,24 @@ def collections_summary(warehouse_id):
                 (WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates),
                 else_=0
             )
-        ).label("total_collections"))
+        ).label("total_collections"),
+
+       (
+        func.sum(
+            case(
+                (WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates),
+                else_=0
+            )
+        )
+        -
+        func.sum(
+            case(
+                (WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates),
+                else_=0
+            )
+        )
+        ).label("total_variances")
+        )
      #.filter(WarehouseTransaction.wrhse_outlet_id == warehouse_id)
         .group_by(WarehouseTransaction.staff_name)
     )
@@ -788,20 +805,26 @@ def collections_summary(warehouse_id):
                 (WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates),
                 else_=0
                 )).label("collections"),
-                #func.sum(WarehouseTransaction.good_crates).label("collections")\
-                #.filter(WarehouseTransaction.transaction_type == 'collection'),
                 func.sum(
                 case(
                 (WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates),
                 else_=0
-                )).label("dispatches"))
-                #func.sum(WarehouseTransaction.good_crates).label("dispatches")\
-                #.filter(WarehouseTransaction.transaction_type == 'dispatch')
-            
-            #.join(Outlet, Outlet.id == WarehouseTransaction.wrhse_outlet_id)
+                )).label("dispatches"),
+                (
+                func.sum(
+                case(
+                    (WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates),
+                    else_=0
+                ))
+                -
+                func.sum(
+                case(
+                    (WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates),
+                    else_=0
+                ))
+                ).label("variances")
+                )
                 .filter(
-                #WarehouseTransaction.wrhse_outlet_id,
-                #== warehouse_id,
                 WarehouseTransaction.staff_name == row.staff_name
                 )
                 .group_by(WarehouseTransaction.notes)
@@ -816,11 +839,13 @@ def collections_summary(warehouse_id):
             "user": row.staff_name,
             "total_collections": row.total_collections or 0,
             "total_dispatches": row.total_dispatches or 0,
+            "total_variances": row.total_variances or 0,
             "branches": [
                 {
                     "branch": b.branch,
                     "collections": b.collections or 0,
-                    "dispatches": b.dispatches or 0
+                    "dispatches": b.dispatches or 0,
+                    "variances": b.variances or 0
                 }
                 for b in branch_data
             ]

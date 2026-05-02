@@ -542,7 +542,7 @@ document.addEventListener("DOMContentLoaded", function() {
           container.innerHTML += `
             <div class="card my-2">
               <div class="card-header" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                ${user.user} — Total Collections: ${user.total_collections} | Total Dispatches: ${user.total_dispatches}
+                ${user.user} — Total Collections: ${user.total_collections} | Total Dispatches: ${user.total_dispatches} | Total Variance: ${user.total_variances}
               </div>
               <div id="${collapseId}" class="collapse">
                 <div class="card-body p-0">
@@ -550,24 +550,29 @@ document.addEventListener("DOMContentLoaded", function() {
                     <thead class="table-light">
                       <tr>
                         <th scope="col">Branch</th>
+			<th scope="col">Dispatches</th>
                         <th scope="col">Collections</th>
-                        <th scope="col">Dispatches</th>
+			<th scope="col">Variances</th>
                       </tr>
                     </thead>
                     <tbody>
                       ${user.branches.map(b => `
                         <tr>
                           <td>${b.branch}</td>
+			  <td>${b.dispatches}</td>
                           <td>${b.collections}</td>
-                          <td>${b.dispatches}</td>
+			  <td>${b.variances}</td>
+                          
                         </tr>
                       `).join("")}
                     </tbody>
                     <tfoot>
                       <tr class="fw-bold">
                         <td>Total</td>
+			<td>${user.total_dispatches}</td>
                         <td>${user.total_collections}</td>
-                        <td>${user.total_dispatches}</td>
+			<td>${user.total_variances}</td>
+                        
                       </tr>
                     </tfoot>
                   </table>
