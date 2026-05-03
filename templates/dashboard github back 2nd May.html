@@ -367,29 +367,11 @@ document.addEventListener('DOMContentLoaded', function () {
         <h6 class="mt-3">New Submitted Values</h6>
         <ul id="newValues"></ul>
       </div>
-	<div class="modal-footer d-flex justify-content-between">
-  	<!-- Right side: Record new + Overwrite -->
-  	<div class="d-flex gap-2">
-    	<button type="button" class="btn btn-warning" id="recordNewEndDay">
-      	Record New End of Day
-    	</button>
-   	<button type="button" class="btn btn-danger" id="confirmOverwrite">
-      	Overwrite Today's Record
-    	</button>
-	<!-- Left side: Cancel -->
-  	<!--div-->
-    	<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-      	Cancel
-    	</button>
-  	<!--/div-->
-  	</div>
-	</div>
-
-      <!--div class="modal-footer"-->
+      <div class="modal-footer">
         <!-- Overwrite button triggers JS handler -->
-        <!--button id="confirmOverwrite" type="button" class="btn btn-danger">Overwrite Today's Record</button-->
-        <!--button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button-->
-      <!--/div-->
+        <button id="confirmOverwrite" type="button" class="btn btn-danger">Overwrite Today's Record</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
     </div>
   </div>
 </div>
@@ -664,10 +646,11 @@ document.getElementById("endDayForm").addEventListener("submit", function(e) {
       const overwriteModal = new bootstrap.Modal(overwriteModalEl);
       overwriteModal.show();
 
-           // Overwrite handler
+      // Overwrite handler
       const confirmBtn = document.getElementById("confirmOverwrite");
       confirmBtn.onclick = function() {
         confirmBtn.disabled = true;
+
         const formData = new FormData(document.getElementById("endDayForm"));
         formData.append("overwrite", "true");
 
@@ -679,6 +662,7 @@ document.getElementById("endDayForm").addEventListener("submit", function(e) {
         .then(data => {
           bootstrap.Modal.getInstance(overwriteModalEl).hide();
           showToast(data.message, "bg-success text-white");
+
           overwriteModalEl.addEventListener('hidden.bs.modal', function () {
             window.location.href = "/dashboard";
           }, { once: true });
@@ -690,31 +674,6 @@ document.getElementById("endDayForm").addEventListener("submit", function(e) {
         });
       };
 
-      // New End of Day handler
-      const recordNewBtn = document.getElementById("recordNewEndDay");
-      recordNewBtn.onclick = function() {
-        recordNewBtn.disabled = true;
-        const formData = new FormData(document.getElementById("endDayForm"));
-        formData.append("new_end_day", "true");
-
-        fetch(document.getElementById("endDayForm").action, {
-          method: "POST",
-          body: formData
-        })
-        .then(res => res.json())
-        .then(data => {
-          bootstrap.Modal.getInstance(overwriteModalEl).hide();
-          showToast(data.message, "bg-success text-white");
-          overwriteModalEl.addEventListener('hidden.bs.modal', function () {
-            window.location.href = "/dashboard";
-          }, { once: true });
-        })
-        .catch(err => {
-          console.error("Error recording new End of Day:", err);
-          showToast("Failed to record new End of Day.", "bg-danger text-white");
-          recordNewBtn.disabled = false;
-        });
-      };
     } else if (data.status === "updated" || data.status === "inserted") {
       showToast(data.message, "bg-success text-white");
       setTimeout(() => { window.location.href = "/dashboard"; }, 1000);

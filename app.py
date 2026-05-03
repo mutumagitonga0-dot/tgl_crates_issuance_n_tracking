@@ -285,7 +285,8 @@ def update_user_password(username: str, plain_password: str) -> bool:
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form["username"]
+        #username = request.form["username"]
+        username = request.form["username"].lower()
         password = request.form["password"]
         print(username,password)
         user = Users.query.filter_by(username=username).first()
@@ -1185,7 +1186,92 @@ def get_reconciliations(offset=0):
     return {"reconciliations": data}
 
 @app.route("/warehouse/<int:id>/endday", methods=["POST"])
-def endday(id): #whrsh_outlets_id
+def endday(id):
+    warehouse = Warehouse.query.filter_by(id=id).first_or_404()
+
+    dispatched_crates = request.form.get("app_dispatched")
+    physical_crates = request.form.get("physical_crates")
+    app_collections = request.form.get("app_collections")
+    variance = request.form.get("variance")
+    staff_name = request.form.get("staff_name")
+    remarks = request.form.get("remarks")
+    overwrite = request.form.get("overwrite")
+    new_end_day = request.form.get("new_end_day")
+
+    # Case 1: Force new entry
+    if new_end_day:
+        new_log = EndDayLog(
+            warehouse_id=warehouse.whrsh_outlets_id,
+            dispatched_crates=dispatched_crates,
+            physical_crates=physical_crates,
+            app_collections=app_collections,
+            variance=variance,
+            staff_name=staff_name,
+            remarks=remarks
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        run_end_day_auto_reconcile_procedure() #to work for this later
+        return jsonify({"status": "inserted", "message": "New End of Day recorded successfully"})
+
+    # Case 2: Check if today’s record exists
+    last_log = (
+        EndDayLog.query
+        .filter(cast(EndDayLog.created_at, Date) == date.today())
+        .order_by(EndDayLog.created_at.desc())
+        .first()
+    )
+
+    if last_log:
+        if overwrite:
+            # Overwrite existing record
+            last_log.dispatched_crates = dispatched_crates
+            last_log.physical_crates = physical_crates
+            last_log.app_collections = app_collections
+            last_log.variance = variance
+            last_log.staff_name = staff_name
+            last_log.remarks = remarks
+            db.session.commit()
+            return jsonify({"status": "updated", "message": "End of Day overwritten successfully"})
+        else:
+            # Return exists response with comparison
+            new_values = {
+                "dispatched_crates": dispatched_crates,
+                "physical_crates": physical_crates,
+                "app_collections": app_collections,
+                "variance": variance,
+                "staff_name": staff_name,
+                "remarks": remarks
+            }
+            return jsonify({
+                "status": "exists",
+                "last_log": {
+                    "physical_crates": last_log.physical_crates,
+                    "app_collections": last_log.app_collections,
+                    "variance": last_log.variance,
+                    "staff_name": last_log.staff_name,
+                    "remarks": last_log.remarks
+                },
+                "new_values": new_values
+            })
+    else:
+        # Case 3: No record today, insert new
+        new_log = EndDayLog(
+            warehouse_id=warehouse.whrsh_outlets_id,
+            dispatched_crates=dispatched_crates,
+            physical_crates=physical_crates,
+            app_collections=app_collections,
+            variance=variance,
+            staff_name=staff_name,
+            remarks=remarks
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        return jsonify({"status": "inserted", "message": "End of Day recorded successfully"})
+
+
+@app.route("/_to_delete_warehouse/<int:id>/endday", methods=["POST"])
+def to_delete_endday(id): #whrsh_outlets_id
     warehouse = Warehouse.query.filter_by(id=id).first_or_404() 
 
     dispatched_crates = request.form.get("app_dispatched")
@@ -1195,45 +1281,50 @@ def endday(id): #whrsh_outlets_id
     staff_name = request.form.get("staff_name")
     remarks = request.form.get("remarks")
     overwrite = request.form.get("overwrite")
+    new_end_day = request.form.get("new_end_day")
 
-    last_log = (
-        EndDayLog.query
-        .filter(cast(EndDayLog.created_at, Date) == date.today())
-        .order_by(EndDayLog.created_at.desc())
-        .first()
-    )
+    print(new_end_day)
 
-    if last_log and not overwrite:
-        new_values = {
-            "dispatched_crates": dispatched_crates,
-            "physical_crates": physical_crates,
-            "app_collections": app_collections,
-            "variance": variance,
-            "staff_name": staff_name,
-            "remarks": remarks
-        }
-        return jsonify({
-            "status": "exists",
-            "last_log": {
-                "physical_crates": last_log.physical_crates,
-                "app_collections": last_log.app_collections,
-                "variance": last_log.variance,
-                "staff_name": last_log.staff_name,
-                "remarks": last_log.remarks
-            },
-            "new_values": new_values
-        })
+    if new_end_day:
+        # Insert or overwrite whrsh_outlets_id 
+        new_log = EndDayLog(
+        warehouse_id=warehouse.whrsh_outlets_id,
+            dispatched_crates=dispatched_crates,
+            physical_crates=physical_crates,
+            app_collections=app_collections,
+            variance=variance,
+            staff_name=staff_name,
+            remarks=remarks
+        )
+    else:    
+        last_log = (
+            EndDayLog.query
+            .filter(cast(EndDayLog.created_at, Date) == date.today())
+            .order_by(EndDayLog.created_at.desc())
+            .first()
+        )
 
-    # Insert or overwrite whrsh_outlets_id 
-    new_log = EndDayLog(
-       warehouse_id=warehouse.whrsh_outlets_id,
-        dispatched_crates=dispatched_crates,
-        physical_crates=physical_crates,
-        app_collections=app_collections,
-        variance=variance,
-        staff_name=staff_name,
-        remarks=remarks
-    )
+        if last_log and not overwrite:
+            new_values = {
+                "dispatched_crates": dispatched_crates,
+                "physical_crates": physical_crates,
+                "app_collections": app_collections,
+                "variance": variance,
+                "staff_name": staff_name,
+                "remarks": remarks
+            }
+            return jsonify({
+                "status": "exists",
+                "last_log": {
+                    "physical_crates": last_log.physical_crates,
+                    "app_collections": last_log.app_collections,
+                    "variance": last_log.variance,
+                    "staff_name": last_log.staff_name,
+                    "remarks": last_log.remarks
+                },
+                "new_values": new_values
+            })
+
     print(f"new_log:", new_log)
     db.session.add(new_log)
     db.session.commit()
@@ -1244,7 +1335,14 @@ def endday(id): #whrsh_outlets_id
     run_end_day_auto_reconcile_procedure()
 
     return jsonify({"status": "updated", "message": "End of Day recorded successfully"})
+    # After reconcile, redirect to print page
+    #return redirect(url_for("end_day_print", warehouse_id=request.form.get("warehouse_id")))
 
+#@app.route("/warehouse/<int:warehouse_id>/end_day_print")
+#def end_day_print(warehouse_id):
+    # Query summary data (same as collections_summary)
+    #summary_data = get_collections_summary(warehouse_id)
+    #return render_template("end_day_print.html", warehouse_id=warehouse_id, summary=summary_data)
 
 def run_end_day_auto_reconcile_procedure():
     # Step 1: Get cutoff window (last two end_day_logs)
