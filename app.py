@@ -326,6 +326,7 @@ def load_user(user_id):
     return Users.query.get(int(user_id))
 
 @app.route("/home", methods=["GET", "POST"])
+@login_required
 def home():
     outlets = Outlet.query.all()
 
@@ -490,6 +491,7 @@ def record_loss(warehouse_id, crates, description="Damaged crates"):
     db.session.commit()
 
 @app.route("/dispatch", methods=["GET", "POST"])
+@login_required
 def record_dispatch():
     db.create_all()
 
@@ -573,6 +575,7 @@ def record_dispatch():
 
 
 @app.route("/collection", methods=["GET", "POST"])
+@login_required
 def record_collection():
     db.create_all()
 
@@ -651,6 +654,77 @@ def record_collection():
 
     # Render template, passing outlets and users
     return render_template("collection.html", outlets=outlets, users=users)
+
+@app.route("/delete_collections_dispatch", methods=["GET"])
+def delete_collections_dispatch():
+    #branchname = request.form.get("outlet_name")
+    #outlet_t = Outlet.query.filter_by(name=branchname).first()
+    #warehouse_id = outlet_t.outlet_id if outlet_t else None
+    
+    #warehouse_id = Warehouse.query.filter_by(id=id).first_or_404()
+    #outlets = Outlet.query.filter_by(warehouse_id=id).all()
+    #outlets = [name for name, name in retrieve_outlets()]
+    outlets = retrieve_outlets()
+    #warehouse=warehouse_id
+    print(outlets)
+    return render_template("collectionsDispatchForm.html",
+                           outlets=outlets)
+
+@app.route("/collections_dispatch", methods=["GET"])
+def collections_dispatch():
+    # Get all outlets
+    outlets = retrieve_outlets()
+    #dispatched =0
+    #collected=0
+    # Build summary list
+    each_outlet_disp_collction_summ = []
+    for outlet_id, outlet_name in outlets:
+        #dispatched, collected = get_daily_dispatch_vers_collection(outlet_name)
+        inv_response = get_inventory(outlet_name)
+        inv_summary = inv_response.get_json()  # convert to dict
+
+        dispatched = inv_summary.get("dispatched", 0)
+        collected = inv_summary.get("collected", 0)
+
+        each_outlet_disp_collction_summ.append({
+            "outlet_id": outlet_id,
+            "outlet_name": outlet_name,
+            "dispatched": dispatched,
+            "collected": collected
+        })
+    print(each_outlet_disp_collction_summ)
+
+    #print(outlets)
+    return render_template(
+        "collectionsDispatchForm.html",
+        outlets=outlets,
+        outlet_summ=each_outlet_disp_collction_summ
+    )
+
+@app.route("/outlet_grid")
+def outlet_grid():
+    return render_template("outlet_grid.html")
+
+@app.route("/warehouse/add_entry", methods=["POST"])
+def add_entry():
+    data = request.get_json()
+    outlet_id = data.get("outlet_id")
+    dispatch_add = int(data.get("dispatch_add") or 0)
+    collection_add = int(data.get("collection_add") or 0)
+
+    outlet = Outlet.query.filter_by(id=outlet_id).first_or_404()
+
+    outlet.total_dispatches = (outlet.total_dispatches or 0) + dispatch_add
+    outlet.total_collections = (outlet.total_collections or 0) + collection_add
+
+    db.session.commit()
+
+    return jsonify({
+        "status": "success",
+        "outlet_id": outlet_id,
+        "total_dispatches": outlet.total_dispatches,
+        "total_collections": outlet.total_collections
+    })
 
 
 from itsdangerous import URLSafeTimedSerializer
@@ -1198,8 +1272,11 @@ def endday(id):
     overwrite = request.form.get("overwrite")
     new_end_day = request.form.get("new_end_day")
 
+    payload = None  # ensure defined
+
     # Case 1: Force new entry
     if new_end_day:
+        print("new_end_day logic detected")
         new_log = EndDayLog(
             warehouse_id=warehouse.whrsh_outlets_id,
             dispatched_crates=dispatched_crates,
@@ -1211,10 +1288,103 @@ def endday(id):
         )
         db.session.add(new_log)
         db.session.commit()
-        run_end_day_auto_reconcile_procedure() #to work for this later
-        return jsonify({"status": "inserted", "message": "New End of Day recorded successfully"})
+        payload = {"status": "inserted", "message": "New End of Day recorded successfully"}
 
-    # Case 2: Check if today’s record exists
+    else:
+        # Case 2: Check if today’s record exists
+        last_log = (
+            EndDayLog.query
+            .filter(cast(EndDayLog.created_at, Date) == date.today())
+            .order_by(EndDayLog.created_at.desc())
+            .first()
+        )
+
+        if last_log:
+            print("last_log detected")
+            if overwrite:
+                print("endday overwrite")
+                # Overwrite existing record
+                last_log.dispatched_crates = dispatched_crates
+                last_log.physical_crates = physical_crates
+                last_log.app_collections = app_collections
+                last_log.variance = variance
+                last_log.staff_name = staff_name
+                last_log.remarks = remarks
+                db.session.commit()
+                payload = {"status": "updated", "message": "End of Day overwritten successfully"}
+            else:
+                # Return exists response with comparison
+                new_values = {
+                    "dispatched_crates": dispatched_crates,
+                    "physical_crates": physical_crates,
+                    "app_collections": app_collections,
+                    "variance": variance,
+                    "staff_name": staff_name,
+                    "remarks": remarks
+                }
+                payload = {
+                    "status": "exists",
+                    "last_log": {
+                        "physical_crates": last_log.physical_crates,
+                        "app_collections": last_log.app_collections,
+                        "variance": last_log.variance,
+                        "staff_name": last_log.staff_name,
+                        "remarks": last_log.remarks
+                    },
+                    "new_values": new_values
+                }
+        else:
+            # Case 3: No record today, insert new
+            new_log = EndDayLog(
+                warehouse_id=warehouse.whrsh_outlets_id,
+                dispatched_crates=dispatched_crates,
+                physical_crates=physical_crates,
+                app_collections=app_collections,
+                variance=variance,
+                staff_name=staff_name,
+                remarks=remarks
+            )
+            db.session.add(new_log)
+            db.session.commit()
+            payload = {"status": "inserted", "message": "End of Day recorded successfully"}
+
+    run_end_day_auto_reconcile_procedure()  # optional
+    return jsonify(payload)
+
+
+@app.route("/err_warehouse/<int:id>/endday", methods=["POST"])
+def err_endday(id):
+    warehouse = Warehouse.query.filter_by(id=id).first_or_404()
+
+    dispatched_crates = request.form.get("app_dispatched")
+    physical_crates = request.form.get("physical_crates")
+    app_collections = request.form.get("app_collections")
+    variance = request.form.get("variance")
+    staff_name = request.form.get("staff_name")
+    remarks = request.form.get("remarks")
+    overwrite = request.form.get("overwrite")
+    new_end_day = request.form.get("new_end_day")
+
+    # Case 1: Force new entry
+    if new_end_day:
+        Print("new_end_day logic detected")
+        new_log = EndDayLog(
+            warehouse_id=warehouse.whrsh_outlets_id,
+            dispatched_crates=dispatched_crates,
+            physical_crates=physical_crates,
+            app_collections=app_collections,
+            variance=variance,
+            staff_name=staff_name,
+            remarks=remarks
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        #run_end_day_auto_reconcile_procedure() #to work for this later
+        #return jsonify({"status": "inserted", "message": "New End of Day recorded successfully"})
+        #jsonify({"status": "inserted", "message": "New End of Day recorded successfully"})
+        payload = {"status" : "inserted", "message" : "New End of Day recorded successfully"}
+
+   # Case 2: Check if today’s record exists
     last_log = (
         EndDayLog.query
         .filter(cast(EndDayLog.created_at, Date) == date.today())
@@ -1223,7 +1393,9 @@ def endday(id):
     )
 
     if last_log:
+        Print("last_log detected")
         if overwrite:
+            Print("endday overwrite")
             # Overwrite existing record
             last_log.dispatched_crates = dispatched_crates
             last_log.physical_crates = physical_crates
@@ -1232,7 +1404,9 @@ def endday(id):
             last_log.staff_name = staff_name
             last_log.remarks = remarks
             db.session.commit()
-            return jsonify({"status": "updated", "message": "End of Day overwritten successfully"})
+            #return jsonify({"status": "updated", "message": "End of Day overwritten successfully"})
+            #jsonify({"status": "updated", "message": "End of Day overwritten successfully"})
+            payload={"status" : "updated", "message" : "End of Day overwritten successfully"}
         else:
             # Return exists response with comparison
             new_values = {
@@ -1243,7 +1417,7 @@ def endday(id):
                 "staff_name": staff_name,
                 "remarks": remarks
             }
-            return jsonify({
+            payload=({
                 "status": "exists",
                 "last_log": {
                     "physical_crates": last_log.physical_crates,
@@ -1254,20 +1428,22 @@ def endday(id):
                 },
                 "new_values": new_values
             })
-    else:
-        # Case 3: No record today, insert new
-        new_log = EndDayLog(
-            warehouse_id=warehouse.whrsh_outlets_id,
-            dispatched_crates=dispatched_crates,
-            physical_crates=physical_crates,
-            app_collections=app_collections,
-            variance=variance,
-            staff_name=staff_name,
-            remarks=remarks
-        )
-        db.session.add(new_log)
-        db.session.commit()
-        return jsonify({"status": "inserted", "message": "End of Day recorded successfully"})
+    #else:
+    #    # Case 3: No record today, insert new
+    #    new_log = EndDayLog(
+    #        warehouse_id=warehouse.whrsh_outlets_id,
+    #        dispatched_crates=dispatched_crates,
+    #        physical_crates=physical_crates,
+    #        app_collections=app_collections,
+    #        variance=variance,
+    #        staff_name=staff_name,
+    #        remarks=remarks
+    #    )
+    #    db.session.add(new_log)
+    #    db.session.commit()
+    #    jsonify({"status": "inserted", "message": "End of Day recorded successfully"})
+    run_end_day_auto_reconcile_procedure() #to work for this later
+    return jsonify(payload)
 
 
 @app.route("/_to_delete_warehouse/<int:id>/endday", methods=["POST"])
@@ -1324,7 +1500,6 @@ def to_delete_endday(id): #whrsh_outlets_id
                 },
                 "new_values": new_values
             })
-
     print(f"new_log:", new_log)
     db.session.add(new_log)
     db.session.commit()
@@ -1345,6 +1520,7 @@ def to_delete_endday(id): #whrsh_outlets_id
     #return render_template("end_day_print.html", warehouse_id=warehouse_id, summary=summary_data)
 
 def run_end_day_auto_reconcile_procedure():
+    print("runing auto end day closure")
     # Step 1: Get cutoff window (last two end_day_logs)
     recent_logs = db.session.query(EndDayLog.created_at)\
         .order_by(EndDayLog.created_at.desc())\
@@ -1373,7 +1549,6 @@ def run_end_day_auto_reconcile_procedure():
      .order_by(Outlet.name).all()
 
     summary = []
-
     # Step 3: Apply rules per outlet
     for row in results:
         variance = (row.total_dispatch or 0) - (row.total_collection or 0)
@@ -1437,7 +1612,7 @@ def run_end_day_auto_reconcile_procedure():
             "variance": variance,
             "action_taken": action_taken
         })
-
+    #print(summary)
     # Step 4: Export summary to PDF
     export_summary_to_pdf(summary)
 
@@ -1613,6 +1788,7 @@ def warehouse_stocktake(whrsh_outlets_id):
     return redirect(url_for('dashboard'))
 
 @app.route("/manage_users", methods=["GET", "POST"])
+@login_required
 def manage_users():
     create_message = ""
     update_message = ""
