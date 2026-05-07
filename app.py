@@ -490,9 +490,292 @@ def record_loss(warehouse_id, crates, description="Damaged crates"):
     db.session.add(txn)
     db.session.commit()
 
-@app.route("/dispatch", methods=["GET", "POST"])
+@app.route("/record/<transaction_type>", methods=["GET", "POST"])
 @login_required
-def record_dispatch():
+def record_transaction(transaction_type):
+    db.create_all()
+
+    # FIX: properly unpack both id and name
+    outlets = [(outlet_id, outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    users = retrieve_offline_users()
+    staff_name = current_user.staff_name
+    last_end_day = get_last_end_day_date()
+
+    if request.method == "POST":
+        if request.form.get("cancelled") == "true":
+            flash("Submission cancelled by user.", "warning")
+            return redirect(request.url)
+
+        branchname = request.form.get("outlet_name")
+        outlet_t = Outlet.query.filter_by(name=branchname).first()
+        warehouse_id = outlet_t.outlet_id if outlet_t else None
+
+        # --- Dispatch ---
+        if transaction_type == "dispatch":
+            good_crates = int(request.form.get("crates_sent") or 0)
+            if good_crates <= 0 or not staff_name:
+                flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
+                return redirect(request.url)
+
+            query = db.session.query(WarehouseTransaction).filter_by(
+                wrhse_outlet_id=warehouse_id,
+                good_crates=good_crates,
+                worn_crates=0,
+                disposed_crates=0,
+                transaction_type="dispatch",
+                notes=branchname,
+                staff_name=staff_name
+            )
+            if last_end_day:
+                query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+            if query.first():
+                flash("⚠️ Duplicate dispatch record detected. Transaction discarded.", "warning")
+                return redirect(request.url)
+
+            db.session.add(WarehouseTransaction(
+                wrhse_outlet_id=warehouse_id,
+                good_crates=good_crates,
+                worn_crates=0,
+                disposed_crates=0,
+                transaction_type="dispatch",
+                notes=branchname,
+                staff_name=staff_name
+            ))
+            db.session.commit()
+            flash(f"Dispatch recorded: {good_crates} crates sent to {branchname} by {staff_name}.", "success")
+            return redirect(url_for("dashboard"))
+
+        # --- Collection ---
+        elif transaction_type == "collection":
+            good_crates = int(request.form.get("crates_collected") or 0)
+            if good_crates <= 0 or not staff_name:
+                flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
+                return redirect(request.url)
+
+            query = db.session.query(WarehouseTransaction).filter_by(
+                wrhse_outlet_id=warehouse_id,
+                good_crates=good_crates,
+                worn_crates=0,
+                disposed_crates=0,
+                transaction_type="collection",
+                notes=branchname,
+                staff_name=staff_name
+            )
+            if last_end_day:
+                query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+            if query.first():
+                flash("⚠️ Duplicate collection record detected. Transaction discarded.", "warning")
+                return redirect(request.url)
+
+            db.session.add(WarehouseTransaction(
+                wrhse_outlet_id=warehouse_id,
+                good_crates=good_crates,
+                worn_crates=0,
+                disposed_crates=0,
+                transaction_type="collection",
+                notes=branchname,
+                staff_name=staff_name
+            ))
+            db.session.commit()
+            flash(f"Collection recorded: {good_crates} crates returned from {branchname} by {staff_name}.", "success")
+            return redirect(url_for("dashboard"))
+
+        # --- Multiple entries ---
+        elif transaction_type == "multiple":
+            completed_outlets = request.json or []  # Expect JSON payload
+
+            for entry in completed_outlets:
+                outlet_id = entry.get("outlet_id")
+                outlet_name = entry.get("outlet_name")
+                dispatched = int(entry.get("dispatched", 0))
+                collected = int(entry.get("collected", 0))
+
+                # Dispatch duplicate check
+                if dispatched > 0:
+                    query = db.session.query(WarehouseTransaction).filter_by(
+                        wrhse_outlet_id=outlet_id,
+                        good_crates=dispatched,
+                        worn_crates=0,
+                        disposed_crates=0,
+                        transaction_type="dispatch",
+                        notes=outlet_name,
+                        staff_name=staff_name
+                    )
+                    if last_end_day:
+                        query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+                    if query.first():
+                        flash(f"⚠️ Duplicate dispatch record detected for {outlet_name}. Skipped.", "warning")
+                    else:
+                        db.session.add(WarehouseTransaction(
+                            wrhse_outlet_id=outlet_id,
+                            good_crates=dispatched,
+                            worn_crates=0,
+                            disposed_crates=0,
+                            transaction_type="dispatch",
+                            notes=outlet_name,
+                            staff_name=staff_name
+                        ))
+
+                # Collection duplicate check
+                if collected > 0:
+                    query = db.session.query(WarehouseTransaction).filter_by(
+                        wrhse_outlet_id=outlet_id,
+                        good_crates=collected,
+                        worn_crates=0,
+                        disposed_crates=0,
+                        transaction_type="collection",
+                        notes=outlet_name,
+                        staff_name=staff_name
+                    )
+                    if last_end_day:
+                        query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+                    if query.first():
+                        flash(f"⚠️ Duplicate collection record detected for {outlet_name}. Skipped.", "warning")
+                    else:
+                        db.session.add(WarehouseTransaction(
+                            wrhse_outlet_id=outlet_id,
+                            good_crates=collected,
+                            worn_crates=0,
+                            disposed_crates=0,
+                            transaction_type="collection",
+                            notes=outlet_name,
+                            staff_name=staff_name
+                        ))
+
+            db.session.commit()
+            flash("Multiple entries processed successfully.", "success")
+            return redirect(url_for("dashboard"))
+
+        else:
+            flash("Invalid transaction type.", "danger")
+            return redirect(request.url)
+
+    # Render correct template
+    if transaction_type == "multiple":
+        return render_template("collections_dispatch_grid_per_row.html",
+                               outlets=outlets, users=users, transaction_type=transaction_type)
+    else:
+        return render_template("record_entry_unified.html",
+                               outlets=outlets, users=users, transaction_type=transaction_type)
+
+
+@app.route("/backup/record/<transaction_type>", methods=["GET", "POST"])
+@login_required
+def backup_record_transaction(transaction_type):
+    db.create_all()
+
+    outlets = [name for name, name in retrieve_outlets()]
+    users = retrieve_offline_users()
+
+    if request.method == "POST":
+        if request.form.get("cancelled") == "true":
+            flash("Submission cancelled by user.", "warning")
+            return redirect(request.url)
+
+        branchname = request.form.get("outlet_name")
+        outlet_t = Outlet.query.filter_by(name=branchname).first()
+        warehouse_id = outlet_t.outlet_id if outlet_t else None
+
+        # Determine transaction type based on which field is present
+        if "crates_sent" in request.form:
+            transaction_type = "dispatch"
+            try:
+                good_crates = int(request.form.get("crates_sent"))
+            except (TypeError, ValueError):
+                good_crates = 0
+        elif "crates_collected" in request.form:
+            transaction_type = "collection"
+            try:
+                good_crates = int(request.form.get("crates_collected"))
+            except (TypeError, ValueError):
+                good_crates = 0
+        else:
+            flash("Invalid submission: missing crates field.", "danger")
+            return redirect(request.url)
+
+        staff_name = current_user.staff_name
+        if good_crates <= 0 or not staff_name:
+            flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
+            return redirect(request.url)
+
+        # Duplicate check
+        last_end_day = get_last_end_day_date()
+        query = db.session.query(WarehouseTransaction).filter_by(
+            wrhse_outlet_id=warehouse_id,
+            good_crates=good_crates,
+            worn_crates=0,
+            disposed_crates=0,
+            transaction_type=transaction_type,
+            notes=branchname,
+            staff_name=staff_name
+        )
+        if last_end_day:
+            query = query.filter(WarehouseTransaction.timestamp > last_end_day)
+
+        existing = query.first()
+        if existing:
+            flash(f"⚠️ Duplicate {transaction_type} record detected. Transaction discarded.", "warning")
+            return redirect(request.url)
+
+        # Insert new record
+        new_record = WarehouseTransaction(
+            wrhse_outlet_id=warehouse_id,
+            good_crates=good_crates,
+            worn_crates=0,
+            disposed_crates=0,
+            transaction_type=transaction_type,
+            notes=branchname,
+            staff_name=staff_name
+        )
+        db.session.add(new_record)
+        db.session.commit()
+
+        flash(f"{transaction_type.capitalize()} recorded: {good_crates} crates for {branchname} by {staff_name}.", "success")
+        return redirect(url_for("dashboard"))
+
+    # Render template, passing outlets and users
+    return render_template("record_entry_unfied.html", outlets=outlets, users=users, transaction_type=transaction_type)
+
+@app.route("/collections_dispatch", methods=["GET"])
+def collections_dispatch():
+    # Get all outlets
+    outlets = retrieve_outlets()
+    #dispatched =0
+    #collected=0
+    # Build summary list
+    each_outlet_disp_collction_summ = []
+    for outlet_id, outlet_name in outlets:
+        #dispatched, collected = get_daily_dispatch_vers_collection(outlet_name)
+        inv_response = get_inventory(outlet_name)
+        inv_summary = inv_response.get_json()  # convert to dict
+
+        dispatched = inv_summary.get("dispatched", 0)
+        collected = inv_summary.get("collected", 0)
+
+        each_outlet_disp_collction_summ.append({
+            "outlet_id": outlet_id,
+            "outlet_name": outlet_name,
+            "dispatched": dispatched,
+            "collected": collected
+        })
+    print(each_outlet_disp_collction_summ)
+
+    #print(outlets)
+    return render_template(
+        "collections_dispatch_grid_per_row.html",
+        #"collectionsDispatchForm.html",
+        outlets=outlets,
+        outlet_summ=each_outlet_disp_collction_summ
+    )
+
+
+@app.route("/not_unified_dispatch", methods=["GET", "POST"])
+@login_required
+def record_dispatch_not_unfied():
     db.create_all()
 
     # Step 1: Fetch branch names and users
@@ -573,10 +856,9 @@ def record_dispatch():
     # Step 2: Render template, passing outlets and users
     return render_template("dispatch.html", outlets=outlets, users=users)
 
-
-@app.route("/collection", methods=["GET", "POST"])
+@app.route("/not_unified_collection", methods=["GET", "POST"])
 @login_required
-def record_collection():
+def record_collection_not_unfied():
     db.create_all()
 
     outlets = [name for name, name in retrieve_outlets()]
@@ -655,51 +937,6 @@ def record_collection():
     # Render template, passing outlets and users
     return render_template("collection.html", outlets=outlets, users=users)
 
-@app.route("/delete_collections_dispatch", methods=["GET"])
-def delete_collections_dispatch():
-    #branchname = request.form.get("outlet_name")
-    #outlet_t = Outlet.query.filter_by(name=branchname).first()
-    #warehouse_id = outlet_t.outlet_id if outlet_t else None
-    
-    #warehouse_id = Warehouse.query.filter_by(id=id).first_or_404()
-    #outlets = Outlet.query.filter_by(warehouse_id=id).all()
-    #outlets = [name for name, name in retrieve_outlets()]
-    outlets = retrieve_outlets()
-    #warehouse=warehouse_id
-    print(outlets)
-    return render_template("collectionsDispatchForm.html",
-                           outlets=outlets)
-
-@app.route("/collections_dispatch", methods=["GET"])
-def collections_dispatch():
-    # Get all outlets
-    outlets = retrieve_outlets()
-    #dispatched =0
-    #collected=0
-    # Build summary list
-    each_outlet_disp_collction_summ = []
-    for outlet_id, outlet_name in outlets:
-        #dispatched, collected = get_daily_dispatch_vers_collection(outlet_name)
-        inv_response = get_inventory(outlet_name)
-        inv_summary = inv_response.get_json()  # convert to dict
-
-        dispatched = inv_summary.get("dispatched", 0)
-        collected = inv_summary.get("collected", 0)
-
-        each_outlet_disp_collction_summ.append({
-            "outlet_id": outlet_id,
-            "outlet_name": outlet_name,
-            "dispatched": dispatched,
-            "collected": collected
-        })
-    print(each_outlet_disp_collction_summ)
-
-    #print(outlets)
-    return render_template(
-        "collectionsDispatchForm.html",
-        outlets=outlets,
-        outlet_summ=each_outlet_disp_collction_summ
-    )
 
 @app.route("/outlet_grid")
 def outlet_grid():
@@ -1350,174 +1587,6 @@ def endday(id):
 
     run_end_day_auto_reconcile_procedure()  # optional
     return jsonify(payload)
-
-
-@app.route("/err_warehouse/<int:id>/endday", methods=["POST"])
-def err_endday(id):
-    warehouse = Warehouse.query.filter_by(id=id).first_or_404()
-
-    dispatched_crates = request.form.get("app_dispatched")
-    physical_crates = request.form.get("physical_crates")
-    app_collections = request.form.get("app_collections")
-    variance = request.form.get("variance")
-    staff_name = request.form.get("staff_name")
-    remarks = request.form.get("remarks")
-    overwrite = request.form.get("overwrite")
-    new_end_day = request.form.get("new_end_day")
-
-    # Case 1: Force new entry
-    if new_end_day:
-        Print("new_end_day logic detected")
-        new_log = EndDayLog(
-            warehouse_id=warehouse.whrsh_outlets_id,
-            dispatched_crates=dispatched_crates,
-            physical_crates=physical_crates,
-            app_collections=app_collections,
-            variance=variance,
-            staff_name=staff_name,
-            remarks=remarks
-        )
-        db.session.add(new_log)
-        db.session.commit()
-        #run_end_day_auto_reconcile_procedure() #to work for this later
-        #return jsonify({"status": "inserted", "message": "New End of Day recorded successfully"})
-        #jsonify({"status": "inserted", "message": "New End of Day recorded successfully"})
-        payload = {"status" : "inserted", "message" : "New End of Day recorded successfully"}
-
-   # Case 2: Check if today’s record exists
-    last_log = (
-        EndDayLog.query
-        .filter(cast(EndDayLog.created_at, Date) == date.today())
-        .order_by(EndDayLog.created_at.desc())
-        .first()
-    )
-
-    if last_log:
-        Print("last_log detected")
-        if overwrite:
-            Print("endday overwrite")
-            # Overwrite existing record
-            last_log.dispatched_crates = dispatched_crates
-            last_log.physical_crates = physical_crates
-            last_log.app_collections = app_collections
-            last_log.variance = variance
-            last_log.staff_name = staff_name
-            last_log.remarks = remarks
-            db.session.commit()
-            #return jsonify({"status": "updated", "message": "End of Day overwritten successfully"})
-            #jsonify({"status": "updated", "message": "End of Day overwritten successfully"})
-            payload={"status" : "updated", "message" : "End of Day overwritten successfully"}
-        else:
-            # Return exists response with comparison
-            new_values = {
-                "dispatched_crates": dispatched_crates,
-                "physical_crates": physical_crates,
-                "app_collections": app_collections,
-                "variance": variance,
-                "staff_name": staff_name,
-                "remarks": remarks
-            }
-            payload=({
-                "status": "exists",
-                "last_log": {
-                    "physical_crates": last_log.physical_crates,
-                    "app_collections": last_log.app_collections,
-                    "variance": last_log.variance,
-                    "staff_name": last_log.staff_name,
-                    "remarks": last_log.remarks
-                },
-                "new_values": new_values
-            })
-    #else:
-    #    # Case 3: No record today, insert new
-    #    new_log = EndDayLog(
-    #        warehouse_id=warehouse.whrsh_outlets_id,
-    #        dispatched_crates=dispatched_crates,
-    #        physical_crates=physical_crates,
-    #        app_collections=app_collections,
-    #        variance=variance,
-    #        staff_name=staff_name,
-    #        remarks=remarks
-    #    )
-    #    db.session.add(new_log)
-    #    db.session.commit()
-    #    jsonify({"status": "inserted", "message": "End of Day recorded successfully"})
-    run_end_day_auto_reconcile_procedure() #to work for this later
-    return jsonify(payload)
-
-
-@app.route("/_to_delete_warehouse/<int:id>/endday", methods=["POST"])
-def to_delete_endday(id): #whrsh_outlets_id
-    warehouse = Warehouse.query.filter_by(id=id).first_or_404() 
-
-    dispatched_crates = request.form.get("app_dispatched")
-    physical_crates = request.form.get("physical_crates")
-    app_collections = request.form.get("app_collections")
-    variance = request.form.get("variance")
-    staff_name = request.form.get("staff_name")
-    remarks = request.form.get("remarks")
-    overwrite = request.form.get("overwrite")
-    new_end_day = request.form.get("new_end_day")
-
-    print(new_end_day)
-
-    if new_end_day:
-        # Insert or overwrite whrsh_outlets_id 
-        new_log = EndDayLog(
-        warehouse_id=warehouse.whrsh_outlets_id,
-            dispatched_crates=dispatched_crates,
-            physical_crates=physical_crates,
-            app_collections=app_collections,
-            variance=variance,
-            staff_name=staff_name,
-            remarks=remarks
-        )
-    else:    
-        last_log = (
-            EndDayLog.query
-            .filter(cast(EndDayLog.created_at, Date) == date.today())
-            .order_by(EndDayLog.created_at.desc())
-            .first()
-        )
-
-        if last_log and not overwrite:
-            new_values = {
-                "dispatched_crates": dispatched_crates,
-                "physical_crates": physical_crates,
-                "app_collections": app_collections,
-                "variance": variance,
-                "staff_name": staff_name,
-                "remarks": remarks
-            }
-            return jsonify({
-                "status": "exists",
-                "last_log": {
-                    "physical_crates": last_log.physical_crates,
-                    "app_collections": last_log.app_collections,
-                    "variance": last_log.variance,
-                    "staff_name": last_log.staff_name,
-                    "remarks": last_log.remarks
-                },
-                "new_values": new_values
-            })
-    print(f"new_log:", new_log)
-    db.session.add(new_log)
-    db.session.commit()
-
-    #if outlet_uncollected_carry_forward:
-    ##    db.session.add_all(outlet_uncollected_carry_forward)
-    #    db.session.commit()
-    run_end_day_auto_reconcile_procedure()
-
-    return jsonify({"status": "updated", "message": "End of Day recorded successfully"})
-    # After reconcile, redirect to print page
-    #return redirect(url_for("end_day_print", warehouse_id=request.form.get("warehouse_id")))
-
-#@app.route("/warehouse/<int:warehouse_id>/end_day_print")
-#def end_day_print(warehouse_id):
-    # Query summary data (same as collections_summary)
-    #summary_data = get_collections_summary(warehouse_id)
-    #return render_template("end_day_print.html", warehouse_id=warehouse_id, summary=summary_data)
 
 def run_end_day_auto_reconcile_procedure():
     print("runing auto end day closure")

@@ -1,3 +1,8 @@
+{% extends "layout.html" %}
+{% block title %}Record Dispatch{% endblock %}
+
+{% block content %}
+
 <form id="collectionsDispatchForm">
   <table class="table text-center align-middle" id="outletTable">
     <thead class="table-light">
@@ -469,4 +474,7 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 
 
+<a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a>
 
+
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+{% block title %}Record {{ transaction_type|capitalize }}{% endblock %}
+
+{% block content %}
+
+<style>
+  body {
+    {% if transaction_type == "dispatch" %}
+      background-color: #f28b82; /* soft red */
+    {% elif transaction_type == "collection" %}
+      background-color: #87cefa; /* sky blue */
+    {% endif %}
+  }
+</style>
+
+<form method="post" class="card p-3"
+      onsubmit="return confirmAndBusy(this,
+        'Do you want to proceed {{ transaction_type }}ing ' 
+        + document.querySelector('[name={{ transaction_type == "dispatch" and "crates_sent" or "crates_collected" }}]').value 
+        + ' crates ' 
+        + ( '{{ transaction_type }}' === 'dispatch' ? 'to outlet ' : 'from outlet ' )
+        + document.querySelector('[name=outlet_name]').value 
+        + ' by staff ' 
+        + document.querySelector('[name=staff_name]').value + '?',
+        'submitBtn');">
+
+  <input type="hidden" name="cancelled" value="false">
+
+  <h2>Record {{ transaction_type|capitalize }}</h2>
+
+  <div class="mb-3">
+    <label class="form-label">Outlet</label>
+    <select name="outlet_name" id="outletSelect" class="form-select" required>
+      <option value="" selected>-- Select Outlet --</option>
+      {% for o in outlets %}
+        <option value="{{ o }}">{{ o }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div id="inventoryResult" class="highlight-label" data-process-type="{{ transaction_type }}"></div>
+
+  {% if transaction_type == "dispatch" %}
+    <div class="mb-3">
+      <label class="form-label">Crates Sent</label>
+      <input type="number" name="crates_sent" class="form-control" required>
+    </div>
+  {% elif transaction_type == "collection" %}
+    <div class="mb-3">
+      <label class="form-label">Crates Collected</label>
+      <input type="number" name="crates_collected" class="form-control" required>
+    </div>
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary" id="submitBtn">
+    Submit {{ transaction_type|capitalize }}
+  </button>
+</form>
+
+<div class="card mt-3">
+  <div class="card-header">Recent {{ transaction_type|capitalize }}s</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Date/Time</th>
+          <th>Crates</th>
+          <th>Recorded By</th>
+        </tr>
+      </thead>
+      <tbody id="recent{{ transaction_type|capitalize }}s"></tbody>
+    </table>
+  </div>
+</div>
+
+<a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a>
+{% endblock %}
