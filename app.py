@@ -496,7 +496,8 @@ def record_transaction(transaction_type):
     db.create_all()
 
     # FIX: properly unpack both id and name
-    outlets = [(outlet_id, outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    #outlets = [(outlet_id, outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    outlets = [name for name, name in retrieve_outlets()]
     users = retrieve_offline_users()
     staff_name = current_user.staff_name
     last_end_day = get_last_end_day_date()
