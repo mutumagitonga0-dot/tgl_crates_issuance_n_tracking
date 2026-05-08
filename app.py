@@ -496,8 +496,8 @@ def record_transaction(transaction_type):
     db.create_all()
 
     # FIX: properly unpack both id and name
-    #outlets = [(outlet_id, outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
-    outlets = [name for name, name in retrieve_outlets()]
+    outlets = [(outlet_id, outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    #outlets = [name for name, name in retrieve_outlets()]
     users = retrieve_offline_users()
     staff_name = current_user.staff_name
     last_end_day = get_last_end_day_date()
@@ -507,9 +507,16 @@ def record_transaction(transaction_type):
             flash("Submission cancelled by user.", "warning")
             return redirect(request.url)
 
-        branchname = request.form.get("outlet_name")
-        outlet_t = Outlet.query.filter_by(name=branchname).first()
+        branch_id = request.form.get("outlet_id")  # comes from <select>
+        outlet_t = Outlet.query.filter_by(outlet_id=branch_id).first()
+        branchname = outlet_t.name if outlet_t else None
+
+
+        #branchname = request.form.get("outlet_name")
+        #outlet_t = Outlet.query.filter_by(name=branchname).first()
         warehouse_id = outlet_t.outlet_id if outlet_t else None
+        #outlet_id = entry.get("outlet_id")
+        #warehouse_id = entry.get("outlet_id")
 
         # --- Dispatch ---
         if transaction_type == "dispatch":
@@ -588,6 +595,11 @@ def record_transaction(transaction_type):
             completed_outlets = request.json or []  # Expect JSON payload
 
             for entry in completed_outlets:
+                #branch_id = request.form.get("outlet_name")  # actually outlet_id now
+                #outlet_t = Outlet.query.filter_by(outlet_id=branch_id).first()
+                #branchname = outlet_t.name if outlet_t else None
+                #outlet_id  = outlet_t.outlet_id if outlet_t else None
+
                 outlet_id = entry.get("outlet_id")
                 outlet_name = entry.get("outlet_name")
                 dispatched = int(entry.get("dispatched", 0))
@@ -999,8 +1011,17 @@ def reset_password(token):
 
     return render_template("reset_password.html")
 
-@app.route("/get_inventory/<outlet>")
-def get_inventory(outlet):
+@app.route("/get_inventory/<int:outlet_id>")
+def get_inventory(outlet_id):
+    #@app.route("/get_inventory/<outlet>")
+    #def get_inventory(outlet):
+    #branch_id = request.form.get("outlet_id")  # comes from <select>
+    outlet_t = Outlet.query.filter_by(outlet_id=outlet_id).first()
+    outlet = outlet_t.name if outlet_t else None
+    #warehouse_id = outlet_t.outlet_id if outlet_t else None
+
+    print(outlet_t) 
+    print(outlet)
     #from datetime import date
     # Example query: total dispatched + collected for today
 
@@ -1052,7 +1073,7 @@ def get_inventory(outlet):
         "thr_recent_dispatch": thr_recent_dispatch,
         "thr_recent_collection": thr_recent_collection
     }
-    #print("DEBUG JSON string:", json.dumps(payload, indent=2))
+    print("DEBUG JSON string:", json.dumps(payload, indent=2))
     return jsonify(payload)
     #return {"dispatched": d, "collected": c, "recorded_by" :sn,"recent_dispatches": thr_lt_d,"recent_collections" :thr_lt_c}
 

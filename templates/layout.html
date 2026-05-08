@@ -248,6 +248,41 @@ function buildMessage(data, processType) {
 }
 </script>
 
+
+<script>
+function populateRecent(data, type) {
+  // Map type to backend key and DOM ID
+  const keyMap = {
+    dispatch: "thr_recent_dispatch",
+    collection: "thr_recent_collection"
+  };
+
+  const tbodyId = "recent" + type.charAt(0).toUpperCase() + type.slice(1) + "es";
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return; // guard against missing element
+
+  tbody.innerHTML = "";
+
+  const records = data[keyMap[type]] || [];
+  if (records.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3">No recent ${type}s.</td></tr>`;
+    return;
+  }
+
+  records.slice(0, 3).forEach(r => {
+    const rowClass = r.staff_name && r.staff_name.startsWith("System Auto")
+      ? "table-danger" : "table-success";
+    const row = `<tr class="${rowClass}">
+        <td>${r.timestamp}</td>
+        <td>${r.good_crates}</td>
+        <td>${r.staff_name}</td>
+      </tr>`;
+    tbody.innerHTML += row;
+  });
+}
+</script>
+
+
 <script>
 function populateDispatches(data) {
   const dispatchTbody = document.getElementById("recentDispatches");
@@ -287,8 +322,69 @@ function populateCollections(data) {
 
 <script>
 document.getElementById("outletSelect").addEventListener("change", function() {
-  const outlet = this.value;
+  const outletId = this.value;
   const processType = document.getElementById("inventoryResult").dataset.processType;
+
+  if (outletId) {
+    fetch(`/get_inventory/${outletId}`)
+      .then(response => response.json())
+      .then(data => {
+        console.log("API response:", data);
+
+        buildMessage(data, processType);
+        populateDispatches(data);
+        populateCollections(data);
+      })
+      .catch(err => {
+        console.error("Fetch error:", err);
+        document.getElementById("inventoryResult").innerHTML =
+          "❌ Error loading inventory.";
+      });
+  } else {
+    document.getElementById("inventoryResult").innerHTML = "";
+    document.getElementById("recentDispatches").innerHTML = "";
+    document.getElementById("recentCollections").innerHTML = "";
+  }
+});
+</script>
+
+<script>
+document.getElementById("unified_outletSelect").addEventListener("change", function() {
+  const outletId = this.value;
+  const processType = document.getElementById("inventoryResult").dataset.processType;
+
+  if (outletId) {
+    fetch(`/get_inventory/${outletId}`)
+      .then(response => response.json())
+      .then(data => {
+        console.log("API response:", data);
+
+        // Update the inventory summary label
+        buildMessage(data, processType);
+
+        // Populate recent tables dynamically
+        populateRecent(data, "dispatch");
+        populateRecent(data, "collection");
+      })
+      .catch(err => {
+        console.error("Fetch error:", err);
+        document.getElementById("inventoryResult").innerHTML =
+          "❌ Error loading inventory.";
+      });
+  } else {
+    document.getElementById("inventoryResult").innerHTML = "";
+    const dispatchTbody = document.getElementById("recentDispatches");
+    const collectionTbody = document.getElementById("recentCollections");
+    if (dispatchTbody) dispatchTbody.innerHTML = "";
+    if (collectionTbody) collectionTbody.innerHTML = "";
+  }
+});
+</script>
+
+<script>
+document.getElementById("Outlet_by_name_outletSelect").addEventListener("change", function() {
+  const outlet = this.value;
+  const processType = document.getElementById("Outlet_by_name_inventoryResult").dataset.processType;
 
   if (outlet) {
     fetch(`/get_inventory/${outlet}`)

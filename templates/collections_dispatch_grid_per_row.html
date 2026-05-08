@@ -22,12 +22,14 @@
         <td class="row-number">1</td>
         <td><input type="checkbox" class="row-check" checked></td>
         <td>
-          <select class="form-select outlet-select">
-            <option value="">-- Choose outlet --</option>
-            {% for outlet_id, outlet_name in outlets %}
-              <option value="{{ outlet_id }}">{{ outlet_name }}</option>
-            {% endfor %}
-          </select>
+          <select id="outletSelect" class="form-select" name="outlet_id" required>
+  <option value="">-- Choose outlet --</option>
+  {% for outlet_id, outlet_name in outlets %}
+    <option value="{{ outlet_id }}">{{ outlet_name }}</option>
+  {% endfor %}
+</select>
+
+
         </td>
         <td class="total-dispatched">0</td>
         <td><input type="number" class="dispatch-add" /></td>
