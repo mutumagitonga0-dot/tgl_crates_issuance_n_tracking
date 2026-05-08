@@ -22,20 +22,20 @@
         <td class="row-number">1</td>
         <td><input type="checkbox" class="row-check" checked></td>
         <td>
-          <select id="outletSelect" class="form-select" name="outlet_id" required>
-  <option value="">-- Choose outlet --</option>
-  {% for outlet_id, outlet_name in outlets %}
-    <option value="{{ outlet_id }}">{{ outlet_name }}</option>
-  {% endfor %}
-</select>
+	<select id="outletSelect" class="form-select outlet-select" name="outlet_id" required>
 
-
-        </td>
-        <td class="total-dispatched">0</td>
-        <td><input type="number" class="dispatch-add" /></td>
-        <td class="total-collected">0</td>
-        <td><input type="number" class="collection-add" /></td>
-        <td><button type="button" id="addBtn" class="btn btn-primary btn-sm">Add</button></td>
+  		<option value="">-- Choose outlet --</option>
+ 		 {% for outlet_id, outlet_name in outlets %}
+   		 <option value="{{ outlet_id }}">{{ outlet_name }}</option>
+  		{% endfor %}
+	   </select>
+    		<!--/td-->
+        	<td class="total-dispatched">0</td>
+        	<td><input type="number" class="dispatch-add" /></td>
+        	<td class="total-collected">0</td>
+        	<td><input type="number" class="collection-add" /></td>
+        	<td><button type="button" id="addBtn" class="btn btn-primary btn-sm">Add</button>
+	</td>
       </tr>
     </tbody>
   </table>
@@ -177,6 +177,9 @@ document.addEventListener("DOMContentLoaded", function() {
             row.querySelector(".outlet-select").focus();
           }
         }
+if (el.classList.contains('outlet-select') && (e.key==='ArrowRight'||e.key==='ArrowLeft'||e.key==='ArrowDown'||e.key==='ArrowUp')) {
+  return; // allow native dropdown scrolling
+}
         if (e.key === "ArrowLeft") {
           e.preventDefault();
           const prev = fields[idx - 1];
@@ -258,6 +261,7 @@ function resetTemplateRow(row) {
   row.querySelector(".collection-add").value = "";
   row.querySelector(".total-dispatched").innerText = "0";
   row.querySelector(".total-collected").innerText = "0";
+  outletSelect.focus(); // 👈 return cursor to outlet dropdown
 }
 
 
@@ -266,6 +270,12 @@ function resetTemplateRow(row) {
     if (completedOutlets.length === 0) {
       alert("No entries to post.");
       return;
+    }
+
+const postConfirm = confirm(`Proceed posting all the submitted entries?`);
+    if (!postConfirm) {
+      //resetTemplateRow(row);
+      return; // abort if user says No
     }
 
     fetch("/record/multiple", {   // ✅ updated route
@@ -291,7 +301,6 @@ function resetTemplateRow(row) {
   });
  }); 
 </script>
-
 
 
 <a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a>

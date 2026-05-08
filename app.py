@@ -502,6 +502,28 @@ def record_transaction(transaction_type):
     staff_name = current_user.staff_name
     last_end_day = get_last_end_day_date()
 
+    each_outlet_disp_collction_summ = []
+    for outlet_id, outlet_name in outlets:
+
+        outlet_t = Outlet.query.filter_by(outlet_id=outlet_id).first()
+        outlet_col_id = outlet_t.outlet_id if outlet_t else None
+
+        #dispatched, collected = get_daily_dispatch_vers_collection(outlet_name)
+        inv_response = get_inventory(outlet_id)
+        inv_summary = inv_response.get_json()  # convert to dict
+
+        dispatched = inv_summary.get("dispatched", 0)
+        collected = inv_summary.get("collected", 0)
+
+        each_outlet_disp_collction_summ.append({
+            "outlet_id": outlet_col_id,
+            "outlet_name": outlet_name,
+            "dispatched": dispatched,
+            "collected": collected
+        })
+    print(each_outlet_disp_collction_summ)
+
+
     if request.method == "POST":
         if request.form.get("cancelled") == "true":
             flash("Submission cancelled by user.", "warning")
@@ -592,6 +614,22 @@ def record_transaction(transaction_type):
 
         # --- Multiple entries ---
         elif transaction_type == "multiple":
+            # Get all outlets
+            #outlets = retrieve_outlets()
+            
+            #dispatched =0
+            #collected=0
+            # Build summary list
+            
+
+            #print(outlets)
+            #return render_template(
+            #    "collections_dispatch_grid_per_row.html",
+            #    #"collectionsDispatchForm.html",
+            #    outlets=outlets,
+            #    outlet_summ=each_outlet_disp_collction_summ
+            #)
+
             completed_outlets = request.json or []  # Expect JSON payload
 
             for entry in completed_outlets:
@@ -669,10 +707,10 @@ def record_transaction(transaction_type):
 
     # Render correct template
     if transaction_type == "multiple":
-        return render_template("collections_dispatch_grid_per_row.html",
-                               outlets=outlets, users=users, transaction_type=transaction_type)
+        return render_template("unified_multi_record_entry_coll_n_disp_grid.html",
+                               outlets=outlets, users=users, transaction_type=transaction_type,outlet_summ=each_outlet_disp_collction_summ)
     else:
-        return render_template("record_entry_unified.html",
+        return render_template("unified_single_record_entry.html",
                                outlets=outlets, users=users, transaction_type=transaction_type)
 
 
