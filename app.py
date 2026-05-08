@@ -301,7 +301,8 @@ def login():
         
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
-            return redirect(url_for("dashboard"))
+            #return redirect(url_for("dashboard"))
+            return redirect(url_for("home"))
         else:
             #print(generate_password_hash("1234"))
             flash("Invalid credentials, please try again.", "danger")
