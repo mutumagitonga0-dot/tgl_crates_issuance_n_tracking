@@ -383,7 +383,48 @@ function resetTemplateRow(row) {
  }); 
 </script>
 
+<script>
+  // 🔑 Global array to track completed outlets
+  let completedOutlets = [];
 
-<a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a>
+  // … then all your other functions and event listeners …
+</script>
+
+<a href="{{ url_for('home') }}" id="homeBtn" class="btn btn-secondary mt-3">⬅️ Return to Home</a>
+
+<script>
+  window.addEventListener("beforeunload", function (e) {
+    const completedBody = document.getElementById("completedBody");
+    const hasRows = completedBody && completedBody.rows.length > 0;
+
+    // OR if you’re tracking with the JS array:
+    const hasUnposted = completedOutlets && completedOutlets.length > 0;
+
+    if (hasRows || hasUnposted) {
+      e.preventDefault();
+      e.returnValue = "This page contains unposted entries. Leave page or stay on page?";
+      return e.returnValue;
+    }
+  });
+
+  // Optional: intercept Home button clicks
+  const homeBtn = document.getElementById("homeBtn"); // adjust to your actual Home button ID
+  if (homeBtn) {
+    homeBtn.addEventListener("click", function (e) {
+      const completedBody = document.getElementById("completedBody");
+      const hasRows = completedBody && completedBody.rows.length > 0;
+      const hasUnposted = completedOutlets && completedOutlets.length > 0;
+
+      if (hasRows || hasUnposted) {
+        const confirmLeave = confirm("This page contains unposted entries. Leave page or stay on page?");
+        if (!confirmLeave) {
+          e.preventDefault();
+        }
+      }
+    });
+  }
+</script>
+
+<!--a href="{{ url_for('home') }}" class="btn btn-secondary mt-3">⬅️ Return to Home</a-->
 
 {% endblock %}
