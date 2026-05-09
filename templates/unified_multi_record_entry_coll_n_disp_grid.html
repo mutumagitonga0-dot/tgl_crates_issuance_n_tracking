@@ -14,7 +14,7 @@
         <th>Add Dispatch</th>
         <th>Total Collected</th>
         <th>Add Collection</th>
-        <th>Action</th>
+        <!--th>Action</th-->
       </tr>
     </thead>
     <tbody>
@@ -29,17 +29,24 @@
    		 <option value="{{ outlet_id }}">{{ outlet_name }}</option>
   		{% endfor %}
 	   </select>
-    		<!--/td-->
+    		</td>
         	<td class="total-dispatched">0</td>
         	<td><input type="number" class="dispatch-add" /></td>
         	<td class="total-collected">0</td>
         	<td><input type="number" class="collection-add" /></td>
-        	<td><button type="button" id="addBtn" class="btn btn-primary btn-sm">Add</button>
+        	<!--td><button type="button" id="addBtn" class="btn btn-primary btn-sm">Add</button-->
 	</td>
       </tr>
     </tbody>
   </table>
 </form>
+
+  	<div class="text-center my-3">
+ 	 <button type="button" id="addBtn" class="btn btn-primary btn-sm">
+   	 Add Entry to posting list?
+ 	 </button>
+	</div>
+	
 
 <div id="summaryPanel" class="mt-3">
   <h4>Completed Outlets</h4>
@@ -129,6 +136,56 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   });
 
+document.getElementById("addBtn").addEventListener("click", function(e) {
+  const row = tableBody.querySelector("tr"); // template row
+  const outletSelect = row.querySelector(".outlet-select");
+  const outletId = outletSelect.value;
+  const outletName = outletSelect.options[outletSelect.selectedIndex].text;
+  const dispatchVal = parseInt(row.querySelector(".dispatch-add").value || 0);
+  const collectionVal = parseInt(row.querySelector(".collection-add").value || 0);
+
+  if (!outletId || (dispatchVal + collectionVal) <= 0) {
+    alert("Please select an outlet and enter valid dispatch/collection values.");
+    return;
+  }
+
+  // Step 1: Ask if user wants to record entry at all
+  const recordConfirm = confirm(`Record entry for ${outletName}?`);
+  if (!recordConfirm) {
+    resetTemplateRow(row);
+    return;
+  }
+
+  // Step 2: Check for duplicate
+  const existing = completedOutlets.find(o => o.outlet_id === outletId);
+
+  if (existing) {
+    const mergeConfirm = confirm(
+      `Outlet ${outletName} already exists.\nDo you want to add these values to the existing record?`
+    );
+    if (mergeConfirm) {
+      existing.dispatched = parseInt(existing.dispatched) + dispatchVal;
+      existing.collected = parseInt(existing.collected) + collectionVal;
+      refreshCompletedTable();
+    } else {
+      resetTemplateRow(row);
+      return;
+    }
+  } else {
+    // New entry
+    completedOutlets.push({
+      outlet_id: outletId,
+      outlet_name: outletName,
+      dispatched: dispatchVal,
+      collected: collectionVal
+    });
+    refreshCompletedTable();
+  }
+
+  // Reset template row after success
+  resetTemplateRow(row);
+});
+
   function refreshCompletedTable() {
     const completedBody = document.getElementById("completedBody");
     completedBody.innerHTML = "";
@@ -155,51 +212,70 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // Keyboard navigation
-  function attachRowHandlers(row) {
-    const outletSelect = row.querySelector(".outlet-select");
-    const dispatchInput = row.querySelector(".dispatch-add");
-    const collectionInput = row.querySelector(".collection-add");
-    const addBtn = row.querySelector("#addBtn");
-    const fields = [outletSelect, dispatchInput, collectionInput, addBtn];
+function attachRowHandlers(row) {
+  const outletSelect = row.querySelector(".outlet-select");
+  const dispatchInput = row.querySelector(".dispatch-add");
+  const collectionInput = row.querySelector(".collection-add");
+  const addBtn = document.getElementById("addBtn"); // button outside row
 
-    fields.forEach((el, idx) => {
-      el.addEventListener("keydown", function(e) {
-        if (["Enter","ArrowRight"].includes(e.key)) {
-          e.preventDefault();
-          const next = fields[idx + 1];
-          if (next) {
-            next.focus();
-            if (next.id === "addBtn" && e.key === "Enter") {
-              next.click(); // trigger Add on Enter
-            }
-          } else {
-	   //postAllBtn.focus() jump to Post All if at end
-            row.querySelector(".outlet-select").focus();
-          }
+  const fields = [outletSelect, dispatchInput, collectionInput, addBtn];
+
+  fields.forEach((el, idx) => {
+    el.addEventListener("keydown", function(e) {
+      if (["Enter","ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+
+        // 🔑 Special case: Enter on Add button
+        if (el.id === "addBtn" && e.key === "Enter") {
+          el.click(); // triggers your click handler with prompts
+          // After add, return focus to outlet select for next entry
+          row.querySelector(".outlet-select").focus();
+          return;
         }
-if (el.classList.contains('outlet-select') && (e.key==='ArrowRight'||e.key==='ArrowLeft'||e.key==='ArrowDown'||e.key==='ArrowUp')) {
-  return; // allow native dropdown scrolling
-}
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          const prev = fields[idx - 1];
-          if (prev) prev.focus();
+
+        // Normal forward navigation
+        const next = fields[idx + 1];
+        if (next) {
+          next.focus();
+        } else {
+          row.querySelector(".outlet-select").focus();
         }
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          const nextRow = row.nextElementSibling;
-          if (nextRow) nextRow.querySelector(".outlet-select").focus();
-          else postAllBtn.focus();
+      }
+
+      // Allow native dropdown scrolling
+      if (el.classList.contains('outlet-select') &&
+          ["ArrowRight","ArrowLeft","ArrowDown","ArrowUp"].includes(e.key)) {
+        return;
+      }
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const prev = fields[idx - 1];
+        if (prev) prev.focus();
+      }
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const nextRow = row.nextElementSibling;
+        if (nextRow) {
+          nextRow.querySelector(".outlet-select").focus();
+        } else {
+          addBtn.focus();
         }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          const prevRow = row.previousElementSibling;
-          if (prevRow) prevRow.querySelector(".outlet-select").focus();
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prevRow = row.previousElementSibling;
+        if (prevRow) {
+          prevRow.querySelector(".outlet-select").focus();
         }
-      });
+      }
     });
-  }
-  attachRowHandlers(tableBody.querySelector("tr"));
+  });
+}
+
+attachRowHandlers(tableBody.querySelector("tr"));
 
 tableBody.addEventListener("click", function(e) {
   if (e.target && e.target.id === "addBtn") {
@@ -266,38 +342,43 @@ function resetTemplateRow(row) {
 
 
  // Handle Post All
-  postAllBtn.addEventListener("click", function() {
-    if (completedOutlets.length === 0) {
-      alert("No entries to post.");
-      return;
-    }
+ postAllBtn.addEventListener("click", function() {
+  if (completedOutlets.length === 0) {
+    alert("No entries to post.");
+    return;
+  }
 
-const postConfirm = confirm(`Proceed posting all the submitted entries?`);
-    if (!postConfirm) {
-      //resetTemplateRow(row);
-      return; // abort if user says No
-    }
+  const postConfirm = confirm(`Proceed posting all the submitted entries?`);
+  if (!postConfirm) {
+    return; // abort if user says No
+  }
 
-    fetch("/record/multiple", {   // ✅ updated route
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(completedOutlets)
-    })
-    .then(res => {
-      if (!res.ok) throw new Error("Network response was not ok");
-      return res.text(); // backend flashes + redirect, so just consume text
-    })
-    .then(() => {
-      alert("Entries posted successfully!");
-      completedOutlets = [];
-      refreshCompletedTable();
-      // Optionally redirect to dashboard after posting
-      window.location.href = "/dashboard";
-    })
-    .catch(err => {
-      console.error("Error posting entries:", err);
-      alert("Failed to post entries.");
-    });
+  // 🔒 Disable the button immediately after confirmation
+  postAllBtn.disabled = true;
+  postAllBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Posting...`;
+
+  fetch("/record/multiple", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(completedOutlets)
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Network response was not ok");
+    return res.text();
+  })
+  .then(() => {
+    alert("Entries posted successfully!");
+    completedOutlets = [];
+    refreshCompletedTable();
+    window.location.href = "/dashboard"; // redirect after posting
+  })
+  .catch(err => {
+    console.error("Error posting entries:", err);
+    alert("Failed to post entries.");
+    // 🔄 Re-enable if posting fails
+    postAllBtn.disabled = false;
+    postAllBtn.textContent = "Post All";
+  });
   });
  }); 
 </script>

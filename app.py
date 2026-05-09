@@ -1531,6 +1531,299 @@ def serialize_txn(txn):
         "staff_name": txn.staff_name
     }
 
+
+def build_user_outlet_summary(outlet_names):
+    #outlets = db.session.query(Outlet).all()
+    #outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    users = {}
+    grand_total_dispatched = 0
+    grand_total_collected = 0
+
+    for outlet_name in outlet_names:
+        # All dispatches since cutoff
+        all_dispatches = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).order_by(WarehouseTransaction.timestamp.desc()).all()
+
+        # All collections since cutoff
+        all_collections = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'collection',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).order_by(WarehouseTransaction.timestamp.desc()).all()
+
+        dispatched_total = sum(txn.good_crates for txn in all_dispatches)
+        collected_total = sum(txn.good_crates for txn in all_collections)
+        variance = dispatched_total - collected_total
+
+        # Pick staff from most recent transaction
+        last_staff = all_dispatches[0].staff_name if all_dispatches else (
+            all_collections[0].staff_name if all_collections else "Unknown"
+        )
+
+        if last_staff not in users:
+            users[last_staff] = {
+                "name": last_staff,
+                "outlets": [],
+                "total_dispatched": 0,
+                "total_collected": 0
+            }
+
+        users[last_staff]["outlets"].append({
+            "name": outlet_name,
+            "dispatched": dispatched_total,
+            "collected": collected_total,
+            "variance": variance,
+            "dispatches": [serialize_txn(txn) for txn in all_dispatches],
+            "collections": [serialize_txn(txn) for txn in all_collections]
+        })
+
+        users[last_staff]["total_dispatched"] += dispatched_total
+        users[last_staff]["total_collected"] += collected_total
+
+        # Update grand totals
+        grand_total_dispatched += dispatched_total
+        grand_total_collected += collected_total
+
+    return list(users.values()), grand_total_dispatched, grand_total_collected, datetime.now()
+
+
+@app.route("/end_of_summary_print")
+def end_of_summary_print():
+    # Extract outlets from Outlet table
+    #outlet_names = [o.name for o in db.session.query(Outlet).all()]
+    #outlet_t = Outlet.query.filter_by(outlet_id=outlet_id).first()
+    #outlet_t = db.session.query(Outlet).all()
+    #outlet_names = outlet_t.name if outlet_t else None
+    outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    #print (outlet_names)
+    # Build summary
+    #users = build_user_outlet_summary(outlet_names)
+    # Unpack the tuple
+    users, grand_total_dispatched, grand_total_collected, report_time = build_user_outlet_summary(outlet_names)
+
+    print("Users type:", type(users))
+    print("First element type:", type(users[0]))
+    print("First element:", users[0])
+
+
+    # Compute grand totals
+    #grand_total_dispatched = sum(u["total_dispatched"] for u in users)
+    #grand_total_collected = sum(u["total_collected"] for u in users)
+    # Now users is a list of dicts
+    grand_total_dispatched = sum(user["total_dispatched"] for user in users)
+    grand_total_collected = sum(user["total_collected"] for user in users)
+
+    # Pass everything to template
+    return render_template(
+        "end_of_summary_print.html",
+        users=users,
+        grand_total_dispatched=grand_total_dispatched,
+        grand_total_collected=grand_total_collected,
+        report_time=datetime.now(),
+        warehouse_id=1 #"Main Warehouse"  # or dynamic ID
+    )
+
+def build_outlet_matrix():
+    outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    users_set = set()
+    outlet_rows = []
+
+    for outlet_name in outlet_names:
+        # Dispatches
+        all_dispatches = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).all()
+
+        # Collections
+        all_collections = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'collection',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).all()
+
+        # Totals
+        dispatched_total = sum(txn.good_crates for txn in all_dispatches)
+        collected_total = sum(txn.good_crates for txn in all_collections)
+
+        # Per‑user breakdown
+        user_dispatch = {}
+        user_collect = {}
+
+        for txn in all_dispatches:
+            users_set.add(txn.staff_name)
+            user_dispatch[txn.staff_name] = user_dispatch.get(txn.staff_name, 0) + txn.good_crates
+
+        for txn in all_collections:
+            users_set.add(txn.staff_name)
+            user_collect[txn.staff_name] = user_collect.get(txn.staff_name, 0) + txn.good_crates
+
+        outlet_rows.append({
+            "name": outlet_name,
+            "total_dispatched": dispatched_total,
+            "total_collected": collected_total,
+            "user_dispatch": user_dispatch,
+            "user_collect": user_collect
+        })
+
+    return outlet_rows, sorted(users_set)
+
+@app.route("/delete_end_of_summary_print_matrix")
+def delete_outlet_matrix():
+    #outlet_names = [o.name for o in db.session.query(Outlet).all()]
+    outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    outlet_rows, users = build_outlet_matrix(outlet_names)
+
+    return render_template(
+        "end_of_summary_print_matrix.html",
+        outlet_rows=outlet_rows,
+        users=users,
+        report_time=datetime.now(),
+        warehouse_id=1 #"Main Warehouse"
+    )
+
+def delete_build_outlet_matrix():
+    #outlet_names = [o.name for o in db.session.query(Outlet).all()]
+    outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
+    users_set = set()
+    outlet_rows = []
+    # loop through outlet_names here...
+    for outlet_name in outlet_names:
+        # Dispatches
+        all_dispatches = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).all()
+
+        # Collections
+        all_collections = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'collection',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).all()
+
+        # Totals
+        dispatched_total = sum(txn.good_crates for txn in all_dispatches)
+        collected_total = sum(txn.good_crates for txn in all_collections)
+
+        # Per‑user breakdown
+        user_dispatch = {}
+        user_collect = {}
+
+        for txn in all_dispatches:
+            users_set.add(txn.staff_name)
+            user_dispatch[txn.staff_name] = user_dispatch.get(txn.staff_name, 0) + txn.good_crates
+
+        for txn in all_collections:
+            users_set.add(txn.staff_name)
+            user_collect[txn.staff_name] = user_collect.get(txn.staff_name, 0) + txn.good_crates
+
+        if dispatched_total+collected_total > 0:
+            outlet_rows.append({
+                "name": outlet_name,
+                "total_dispatched": dispatched_total,
+                "total_collected": collected_total,
+                "user_dispatch": user_dispatch,
+                "user_collect": user_collect
+            })
+
+    return outlet_rows, sorted(users_set)
+
+def build_outlet_matrix():
+    outlet_names = [o.name for o in db.session.query(Outlet).all()]
+    users_set = set()
+    outlet_rows = []
+    grand_totals_dispatch = {}
+    grand_totals_collect = {}
+    total_dispatch_all = 0
+    total_collect_all = 0
+
+    for outlet_name in outlet_names:
+        all_dispatches = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'dispatch',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).all()
+
+        all_collections = db.session.query(WarehouseTransaction)\
+            .filter(
+                WarehouseTransaction.notes == outlet_name,
+                WarehouseTransaction.transaction_type == 'collection',
+                WarehouseTransaction.timestamp > get_last_end_day_date()
+            ).all()
+
+        dispatched_total = sum(txn.good_crates for txn in all_dispatches)
+        collected_total = sum(txn.good_crates for txn in all_collections)
+
+        user_dispatch = {}
+        user_collect = {}
+
+        for txn in all_dispatches:
+            users_set.add(txn.staff_name)
+            user_dispatch[txn.staff_name] = user_dispatch.get(txn.staff_name, 0) + txn.good_crates
+            grand_totals_dispatch[txn.staff_name] = grand_totals_dispatch.get(txn.staff_name, 0) + txn.good_crates
+
+        for txn in all_collections:
+            users_set.add(txn.staff_name)
+            user_collect[txn.staff_name] = user_collect.get(txn.staff_name, 0) + txn.good_crates
+            grand_totals_collect[txn.staff_name] = grand_totals_collect.get(txn.staff_name, 0) + txn.good_crates
+
+        if dispatched_total+collected_total > 0:
+            outlet_rows.append({
+                "name": outlet_name,
+                "total_dispatched": dispatched_total,
+                "total_collected": collected_total,
+                "user_dispatch": user_dispatch,
+                "user_collect": user_collect
+            })
+
+        total_dispatch_all += dispatched_total
+        total_collect_all += collected_total
+
+    return outlet_rows, sorted(users_set), grand_totals_dispatch, grand_totals_collect, total_dispatch_all, total_collect_all
+
+@app.route("/end_of_summary_print_matrix")
+def outlet_matrix():
+    outlet_rows, users, grand_totals_dispatch, grand_totals_collect, total_dispatch_all, total_collect_all = build_outlet_matrix()
+
+    return render_template(
+        "end_of_summary_print_matrix.html",
+        outlet_rows=outlet_rows,
+        users=users,
+        grand_totals_dispatch=grand_totals_dispatch,
+        grand_totals_collect=grand_totals_collect,
+        total_dispatch_all=total_dispatch_all,
+        total_collect_all=total_collect_all,
+        report_time=datetime.now(),
+        warehouse_id=1 #"Main Warehouse"
+    )
+
+
+@app.route("/delete_end_of_summary_print_matrix")
+def detete_outlet_matrix():
+    outlet_rows, users = build_outlet_matrix()  # or with outlet_names if you keep the parameter
+    return render_template(
+        "end_of_summary_print_matrix.html",
+        outlet_rows=outlet_rows,
+        users=users,
+        report_time=datetime.now(),
+        warehouse_id=1 #"Main Warehouse"
+    )
+
+
+
 @app.route("/reconciliations/<int:offset>")
 def get_reconciliations(offset=0):
     logs = (

@@ -1,0 +1,36 @@
+<div class="container mt-4">
+  <h3>Outlet Matrix – {{ warehouse_id }}</h3>
+
+  <table id="outletMatrixTable" class="table table-bordered table-sm">
+    <thead class="table-light">
+      <tr>
+        <th>Outlet</th>
+        <th>Total Dispatched</th>
+        <th>Total Collected</th>
+        {% for user in users %}
+          <th>{{ user }} Dispatched</th>
+          <th>{{ user }} Collected</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for outlet in outlet_rows %}
+      <tr>
+        <td>{{ outlet.name }}</td>
+        <td>{{ outlet.total_dispatched }}</td>
+        <td>{{ outlet.total_collected }}</td>
+        {% for user in users %}
+          <td>{{ outlet.user_dispatch.get(user, 0) }}</td>
+          <td>{{ outlet.user_collect.get(user, 0) }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="text-muted small mt-2">
+    Generated on: {{ report_time.strftime("%Y-%m-%d %H:%M:%S") }}
+  </div>
+
+  <button class="btn btn-primary no-print mt-3" onclick="window.print()">Print</button>
+</div>
