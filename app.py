@@ -1,6 +1,6 @@
 import os
 from datetime import datetime,timezone,date
-from flask import Flask, request, render_template_string, redirect, url_for, flash, render_template, jsonify,json
+from flask import Flask,Response, request, render_template_string, redirect, url_for, flash, render_template, jsonify,json
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy 
@@ -10,6 +10,8 @@ from flask_migrate import Migrate
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
+#from weasyprint import HTML
+import pdfkit
 
 
 #from flask import Flask, render_template, request, redirect, url_for, flash
@@ -1379,7 +1381,8 @@ def dashboard():
     #print("Warehouse object:", warehouse)
     #print("Warehouse.id:", warehouse.id if warehouse else None)
     #print("Warehouse.whrsh_outlets_id:", warehouse.whrsh_outlets_id if warehouse else None)
-
+    staff_name = current_user.staff_name
+    print(staff_name)
     return render_template(
         "dashboard.html",
         warehouse=warehouse,
@@ -1388,6 +1391,7 @@ def dashboard():
         warehouse_summary_text=warehouse_summary_text,
         #outlet_stats=outlet_stats,
         users=users,
+        staff_name=staff_name,
         last_rec=last_rec,
         reconciliations=reconciliations,
         app_auto_collections=total_collected_for_all,
@@ -1628,119 +1632,7 @@ def end_of_summary_print():
         warehouse_id=1 #"Main Warehouse"  # or dynamic ID
     )
 
-def build_outlet_matrix():
-    outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
-    users_set = set()
-    outlet_rows = []
-
-    for outlet_name in outlet_names:
-        # Dispatches
-        all_dispatches = db.session.query(WarehouseTransaction)\
-            .filter(
-                WarehouseTransaction.notes == outlet_name,
-                WarehouseTransaction.transaction_type == 'dispatch',
-                WarehouseTransaction.timestamp > get_last_end_day_date()
-            ).all()
-
-        # Collections
-        all_collections = db.session.query(WarehouseTransaction)\
-            .filter(
-                WarehouseTransaction.notes == outlet_name,
-                WarehouseTransaction.transaction_type == 'collection',
-                WarehouseTransaction.timestamp > get_last_end_day_date()
-            ).all()
-
-        # Totals
-        dispatched_total = sum(txn.good_crates for txn in all_dispatches)
-        collected_total = sum(txn.good_crates for txn in all_collections)
-
-        # Per‑user breakdown
-        user_dispatch = {}
-        user_collect = {}
-
-        for txn in all_dispatches:
-            users_set.add(txn.staff_name)
-            user_dispatch[txn.staff_name] = user_dispatch.get(txn.staff_name, 0) + txn.good_crates
-
-        for txn in all_collections:
-            users_set.add(txn.staff_name)
-            user_collect[txn.staff_name] = user_collect.get(txn.staff_name, 0) + txn.good_crates
-
-        outlet_rows.append({
-            "name": outlet_name,
-            "total_dispatched": dispatched_total,
-            "total_collected": collected_total,
-            "user_dispatch": user_dispatch,
-            "user_collect": user_collect
-        })
-
-    return outlet_rows, sorted(users_set)
-
-@app.route("/delete_end_of_summary_print_matrix")
-def delete_outlet_matrix():
-    #outlet_names = [o.name for o in db.session.query(Outlet).all()]
-    outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
-    outlet_rows, users = build_outlet_matrix(outlet_names)
-
-    return render_template(
-        "end_of_summary_print_matrix.html",
-        outlet_rows=outlet_rows,
-        users=users,
-        report_time=datetime.now(),
-        warehouse_id=1 #"Main Warehouse"
-    )
-
-def delete_build_outlet_matrix():
-    #outlet_names = [o.name for o in db.session.query(Outlet).all()]
-    outlet_names = [(outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
-    users_set = set()
-    outlet_rows = []
-    # loop through outlet_names here...
-    for outlet_name in outlet_names:
-        # Dispatches
-        all_dispatches = db.session.query(WarehouseTransaction)\
-            .filter(
-                WarehouseTransaction.notes == outlet_name,
-                WarehouseTransaction.transaction_type == 'dispatch',
-                WarehouseTransaction.timestamp > get_last_end_day_date()
-            ).all()
-
-        # Collections
-        all_collections = db.session.query(WarehouseTransaction)\
-            .filter(
-                WarehouseTransaction.notes == outlet_name,
-                WarehouseTransaction.transaction_type == 'collection',
-                WarehouseTransaction.timestamp > get_last_end_day_date()
-            ).all()
-
-        # Totals
-        dispatched_total = sum(txn.good_crates for txn in all_dispatches)
-        collected_total = sum(txn.good_crates for txn in all_collections)
-
-        # Per‑user breakdown
-        user_dispatch = {}
-        user_collect = {}
-
-        for txn in all_dispatches:
-            users_set.add(txn.staff_name)
-            user_dispatch[txn.staff_name] = user_dispatch.get(txn.staff_name, 0) + txn.good_crates
-
-        for txn in all_collections:
-            users_set.add(txn.staff_name)
-            user_collect[txn.staff_name] = user_collect.get(txn.staff_name, 0) + txn.good_crates
-
-        if dispatched_total+collected_total > 0:
-            outlet_rows.append({
-                "name": outlet_name,
-                "total_dispatched": dispatched_total,
-                "total_collected": collected_total,
-                "user_dispatch": user_dispatch,
-                "user_collect": user_collect
-            })
-
-    return outlet_rows, sorted(users_set)
-
-def build_outlet_matrix():
+def build_matrix_for_outlet_daily_summary_printout():
     outlet_names = [o.name for o in db.session.query(Outlet).all()]
     users_set = set()
     outlet_rows = []
@@ -1794,61 +1686,82 @@ def build_outlet_matrix():
 
     return outlet_rows, sorted(users_set), grand_totals_dispatch, grand_totals_collect, total_dispatch_all, total_collect_all
 
+#@app.route("/warehouse/<int:warehouse_id>/collections_summary")
 @app.route("/end_of_summary_print_matrix")
-def outlet_matrix():
-    outlet_rows, users, grand_totals_dispatch, grand_totals_collect, total_dispatch_all, total_collect_all = build_outlet_matrix()
+def daily_outlet_matrix_printout():
+    outlet_rows, users, grand_totals_dispatch, grand_totals_collect, total_dispatch_all, total_collect_all = build_matrix_for_outlet_daily_summary_printout()
 
+    #return render_template(
+    #    "end_of_summary_print_matrix.html",
+    #    outlet_rows=outlet_rows,
+    #    users=users,
+    #    grand_totals_dispatch=grand_totals_dispatch,
+    #    grand_totals_collect=grand_totals_collect,
+    #    total_dispatch_all=total_dispatch_all,
+    #    total_collect_all=total_collect_all,
+    #    report_time=datetime.now(),
+    #    warehouse_id=1 #"Main Warehouse"
+    #)
+    return jsonify({
+        "outlet_rows": outlet_rows,
+        "users": users,
+        "grand_totals_dispatch": grand_totals_dispatch,
+        "grand_totals_collect": grand_totals_collect,
+        "total_dispatch_all": total_dispatch_all,
+        "total_collect_all": total_collect_all,
+        "report_time": datetime.now().isoformat(),
+        "warehouse_id": 1
+    })
+
+@app.route("/end_of_day_closure/<date>")
+def end_of_day_closure(date):
+    outlet_rows, users, grand_totals_dispatch, grand_totals_collect, total_dispatch_all, total_collect_all = build_matrix_for_outlet_daily_summary_printout()
+
+    # fetch outlet_rows, users, totals, etc.
+    report_time = datetime.now()
     return render_template(
-        "end_of_summary_print_matrix.html",
+        "end_of_day_closure.html",
+        warehouse_id=1,
         outlet_rows=outlet_rows,
         users=users,
-        grand_totals_dispatch=grand_totals_dispatch,
-        grand_totals_collect=grand_totals_collect,
         total_dispatch_all=total_dispatch_all,
         total_collect_all=total_collect_all,
-        report_time=datetime.now(),
-        warehouse_id=1 #"Main Warehouse"
+        grand_totals_dispatch=grand_totals_dispatch,
+        grand_totals_collect=grand_totals_collect,
+        report_time=report_time,
+        closure_date=date
     )
 
 
-@app.route("/delete_end_of_summary_print_matrix")
-def detete_outlet_matrix():
-    outlet_rows, users = build_outlet_matrix()  # or with outlet_names if you keep the parameter
-    return render_template(
-        "end_of_summary_print_matrix.html",
+@app.route("/download_pdf/<date>")
+def download_pdf(date):
+    outlet_rows, users, grand_totals_dispatch, grand_totals_collect, total_dispatch_all, total_collect_all = build_matrix_for_outlet_daily_summary_printout()
+
+    # Prepare your data
+    report_time = datetime.now()
+
+  # Render the closure report HTML
+    html = render_template(
+        "end_of_day_closure.html",
+        warehouse_id=1,
         outlet_rows=outlet_rows,
         users=users,
-        report_time=datetime.now(),
-        warehouse_id=1 #"Main Warehouse"
+        total_dispatch_all=total_dispatch_all,
+        total_collect_all=total_collect_all,
+        grand_totals_dispatch=grand_totals_dispatch,
+        grand_totals_collect=grand_totals_collect,
+        report_time=report_time,
+        closure_date=date
     )
 
+    # Generate PDF (wkhtmltopdf must be installed on the server hosting this app)
+    pdf = pdfkit.from_string(html, False)
 
-
-@app.route("/reconciliations/<int:offset>")
-def get_reconciliations(offset=0):
-    logs = (
-        EndDayLog.query
-        .order_by(EndDayLog.created_at.desc())
-        .offset(offset)
-        .limit(20)
-        .all()
+    return Response(
+        pdf,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment;filename=closure_{date}.pdf"}
     )
-
-    # Convert to JSON-friendly dicts
-    data = []
-    for rec in logs:
-        data.append({
-            "created_at": rec.created_at.strftime("%d %B %Y"),
-            "dispatched_crates": rec.dispatched_crates,
-            "app_collections": rec.app_collections,
-            "physical_crates": rec.physical_crates,
-            "staff_name": rec.staff_name,
-            "variance": rec.variance,
-            "performance": round(
-                (rec.physical_crates / (rec.app_collections if rec.app_collections > 0 else 1)) * 100, 2
-            )
-        })
-    return {"reconciliations": data}
 
 @app.route("/warehouse/<int:id>/endday", methods=["POST"])
 def endday(id):
@@ -1858,7 +1771,8 @@ def endday(id):
     physical_crates = request.form.get("physical_crates")
     app_collections = request.form.get("app_collections")
     variance = request.form.get("variance")
-    staff_name = request.form.get("staff_name")
+    #staff_name = request.form.get("staff_name")
+    staff_name = current_user.staff_name
     remarks = request.form.get("remarks")
     overwrite = request.form.get("overwrite")
     new_end_day = request.form.get("new_end_day")
@@ -1939,7 +1853,8 @@ def endday(id):
             db.session.commit()
             payload = {"status": "inserted", "message": "End of Day recorded successfully"}
 
-    run_end_day_auto_reconcile_procedure()  # optional
+    #run_end_day_auto_reconcile_procedure()  # optional
+    daily_outlet_matrix_printout()
     return jsonify(payload)
 
 def run_end_day_auto_reconcile_procedure():
@@ -2041,6 +1956,31 @@ def run_end_day_auto_reconcile_procedure():
 
     return summary
 
+@app.route("/reconciliations/<int:offset>")
+def get_reconciliations(offset=0):
+    logs = (
+        EndDayLog.query
+        .order_by(EndDayLog.created_at.desc())
+        .offset(offset)
+        .limit(20)
+        .all()
+    )
+
+    # Convert to JSON-friendly dicts
+    data = []
+    for rec in logs:
+        data.append({
+            "created_at": rec.created_at.strftime("%d %B %Y"),
+            "dispatched_crates": rec.dispatched_crates,
+            "app_collections": rec.app_collections,
+            "physical_crates": rec.physical_crates,
+            "staff_name": rec.staff_name,
+            "variance": rec.variance,
+            "performance": round(
+                (rec.physical_crates / (rec.app_collections if rec.app_collections > 0 else 1)) * 100, 2
+            )
+        })
+    return {"reconciliations": data}
 
 def export_summary_to_pdf(summary):
     filename = f"end_day_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
