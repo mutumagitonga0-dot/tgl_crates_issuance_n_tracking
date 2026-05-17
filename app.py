@@ -11,7 +11,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 #from weasyprint import HTML
-import pdfkit
+#import pdfkit
 
 
 #from flask import Flask, render_template, request, redirect, url_for, flash
