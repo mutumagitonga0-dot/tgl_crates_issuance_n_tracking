@@ -1773,6 +1773,7 @@ def endday(id):
     variance = request.form.get("variance")
     #staff_name = request.form.get("staff_name")
     staff_name = current_user.staff_name
+    print("trying to fecth html user",{staff_name})
     remarks = request.form.get("remarks")
     overwrite = request.form.get("overwrite")
     new_end_day = request.form.get("new_end_day")
@@ -1853,8 +1854,8 @@ def endday(id):
             db.session.commit()
             payload = {"status": "inserted", "message": "End of Day recorded successfully"}
 
-    #run_end_day_auto_reconcile_procedure()  # optional
     daily_outlet_matrix_printout()
+    run_end_day_auto_reconcile_procedure()  # optional
     return jsonify(payload)
 
 def run_end_day_auto_reconcile_procedure():
@@ -1912,7 +1913,7 @@ def run_end_day_auto_reconcile_procedure():
                         good_crates=variance,
                         notes=row.outlet_name,
                         timestamp=datetime.now(),
-                        staff_name="System Auto‑CarryForward"
+                        staff_name="Sys Auto‑CarryForward"
                     )
                     db.session.add(new_tx)
                     db.session.commit()
@@ -1936,7 +1937,7 @@ def run_end_day_auto_reconcile_procedure():
                         good_crates=variance,
                         notes=row.outlet_name,
                         timestamp=datetime.now(),
-                        staff_name="System Auto‑Adjust"
+                        staff_name="Sys Auto‑Adjust"
                     )
                     db.session.add(new_tx)
                     db.session.commit()
@@ -1952,7 +1953,7 @@ def run_end_day_auto_reconcile_procedure():
         })
     #print(summary)
     # Step 4: Export summary to PDF
-    export_summary_to_pdf(summary)
+    #export_summary_to_pdf(summary) #currently not using
 
     return summary
 
