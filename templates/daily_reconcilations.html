@@ -1,4 +1,3 @@
-{% block title %}Daily Reconcilations{% endblock %}
 
 {% block content %}
 
@@ -62,9 +61,6 @@
     </div>
   </div>
 </div>
-
-  <!-- End of Day Modal -->
-  {{ end_day_modal|safe }}
 
 
 
@@ -286,9 +282,6 @@ function showToast(message, classes) {
 <div id="errorPanel" class="alert alert-danger d-none"></div>
 
 
-
-
-
 <style>
 @media print {
   /* Hide modal chrome and buttons */
@@ -350,7 +343,8 @@ function showToast(message, classes) {
 <button id="openClosureReport" class="btn btn-sm btn-primary ms-3">
   End of Day Closure
 </button>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <!--button type="button" class="btn-close" data-bs-dismiss="modal"></button-->
+	<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
        </div>
      <div class="modal-body" id="collections_summary">
         <!-- JS will inject cards here -->
@@ -389,7 +383,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-  const closureBtn = document.getElementById("openClosureReport");
+  const closureBtn = document.getElementById("delete_openClosureReport");
   if (closureBtn) {
     closureBtn.addEventListener("click", function() {
       // Get the date from the input field
@@ -405,6 +399,71 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const closureBtn = document.getElementById("delete_openClosureReport");
+  if (closureBtn) {
+    closureBtn.addEventListener("click", function() {
+      const dateInput = document.getElementById("summaryDate");
+      const closureDate = dateInput ? dateInput.value : "";
+
+      // Build URL safely
+      const url = "/end_of_day_closure/" + encodeURIComponent(closureDate || "today");
+
+      // Open in new tab with proper features
+      window.open(url, "_blank", "width=1200,height=800,scrollbars=yes,resizable=yes");
+    });
+  }
+});
+
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // --- End of Day Closure button ---
+  const closureBtn = document.getElementById("openClosureReport");
+  if (closureBtn) {
+    closureBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+
+      // Show busy cursor immediately
+      document.body.style.cursor = "wait";
+
+      // Debounce: disable briefly to prevent multiple rapid clicks
+      closureBtn.disabled = true;
+
+      const dateInput = document.getElementById("summaryDate");
+      const closureDate = dateInput ? dateInput.value : "";
+      const url = "/end_of_day_closure/" + encodeURIComponent(closureDate || "today");
+
+      // Open in new tab
+      //window.open(url, "_blank", "width=1200,height=800,scrollbars=yes,resizable=yes");
+     // Open in a new tab (not a popup window)
+      window.open(url, "_blank");
+
+      // Reset cursor and re-enable after short delay
+      setTimeout(() => {
+        document.body.style.cursor = "default";
+        closureBtn.disabled = false;
+      }, 800);
+    });
+  }
+
+  // --- Modal close button stabilization ---
+  const collectionsModalEl = document.getElementById('collectionsModal');
+  if (collectionsModalEl) {
+    collectionsModalEl.addEventListener('hide.bs.modal', () => {
+      // Show busy cursor while closing
+      document.body.style.cursor = "wait";
+    });
+    collectionsModalEl.addEventListener('hidden.bs.modal', () => {
+      // Reset cursor after modal is fully closed
+      document.body.style.cursor = "default";
+    });
+  }
+});
+</script>
 
 
 <script>
