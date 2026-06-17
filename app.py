@@ -88,6 +88,19 @@ class Users(db.Model, UserMixin):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     status = db.Column(db.Integer, nullable=False)    
+    suspended = db.Column(db.Boolean, default=False)
+    feed_entries = db.Column(db.Boolean, default=False)
+    amend_entry = db.Column(db.Boolean, default=False)
+    provision1 = db.Column(db.Boolean, default=False)
+    provision2 = db.Column(db.Boolean, default=False)
+    provision3 = db.Column(db.Boolean, default=False)
+    provision4 = db.Column(db.Boolean, default=False)
+    provision5 = db.Column(db.Boolean, default=False)
+    provision6 = db.Column(db.Boolean, default=False)
+    provision7 = db.Column(db.Boolean, default=False)
+    provision8 = db.Column(db.Boolean, default=False)
+    provision9 = db.Column(db.Boolean, default=False)
+
 
 
 class Warehouse(db.Model):
@@ -153,6 +166,34 @@ def init_db():
 
         from sqlalchemy import text
         try:
+            # Add privilege columns if missing
+            privilege_columns = [
+                ("suspended", "BIT", "0"),
+                ("feed_entries", "BIT", "0"),
+                ("amend_entry", "BIT", "0"),
+                ("provision1", "BIT", "0"),
+                ("provision2", "BIT", "0"),
+                ("provision3", "BIT", "0"),
+                ("provision4", "BIT", "0"),
+                ("provision5", "BIT", "0"),
+                ("provision6", "BIT", "0"),
+                ("provision7", "BIT", "0"),
+                ("provision8", "BIT", "0"),
+                ("provision9", "BIT", "0"),
+            ]
+
+            for col_name, col_type, default in privilege_columns:
+                db.session.execute(text(f"""
+                    IF NOT EXISTS (
+                        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = 'users' AND COLUMN_NAME = '{col_name}'
+                    )
+                    ALTER TABLE users ADD {col_name} {col_type}
+                    CONSTRAINT DF_users_{col_name} DEFAULT {default} NOT NULL;
+                """))
+
+            db.session.commit()
+
             # Add username column with default if missing
             db.session.execute(text("""
                 IF NOT EXISTS (
@@ -183,7 +224,51 @@ def init_db():
                 CONSTRAINT DF_users_status DEFAULT 1 NOT NULL;
             """))
 
+            # Rename column 'inactive' to 'suspended' if it exists
+            db.session.execute(text("""
+                IF EXISTS (
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'inactive'
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'suspended'
+                )
+                BEGIN
+                    EXEC sp_rename 'users.inactive', 'suspended', 'COLUMN';
+                END
+            """))
             db.session.commit()
+
+            # Safely drop column 'inactive' by removing its default constraint first
+            db.session.execute(text("""
+                DECLARE @ConstraintName NVARCHAR(200);
+
+                -- Find the default constraint bound to 'inactive'
+                SELECT @ConstraintName = dc.name
+                FROM sys.default_constraints dc
+                INNER JOIN sys.columns c ON c.default_object_id = dc.object_id
+                INNER JOIN sys.tables t ON t.object_id = c.object_id
+                WHERE t.name = 'users' AND c.name = 'inactive';
+
+                -- Drop the constraint if found
+                IF @ConstraintName IS NOT NULL
+                BEGIN
+                    EXEC('ALTER TABLE users DROP CONSTRAINT ' + @ConstraintName);
+                END
+
+                -- Now drop the column if it exists
+                IF EXISTS (
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'inactive'
+                )
+                BEGIN
+                    ALTER TABLE users DROP COLUMN inactive;
+                END
+            """))
+            db.session.commit()
+
+
         except Exception as e:
             db.session.rollback()
             return f"Error altering table: {e}", 500
@@ -234,6 +319,8 @@ def connect_sqlalchemy_database_through_cmd():
     # Full connection string
     conn_str = "postgresql://tgl_crates_db_user:Vk1PPiktlT6aktTgzdCCNkQZZFfLeiX5@dpg-d6uodkchg0os73f4kql0-a.oregon-postgres.render.com/tgl_crates_db"
     
+    #full cmd string 
+    cmd_str = r"C:\Program Files\PostgreSQL\18\bin\psql.exe" "postgresql://tgl_crates_db_user:Vk1PPiktlT6aktTgzdCCNkQZZFfLeiX5@dpg-d6uodkchg0os73f4kql0-a.oregon-postgres.render.com/tgl_crates_db"
     # Run the command
 
 
@@ -292,16 +379,18 @@ def login():
         password = request.form["password"]
         print(username,password)
         user = Users.query.filter_by(username=username).first()
+        
         print(user)
-
+        #print(user.suspended)
         # Update Admin user
         #success = update_user_password("tempuser", "changeme")
         #if success:
         #    print("Password updated and hashed successfully.")
         #else:
         #    print("User not found.")
-        
-        if user and check_password_hash(user.password_hash, password):
+        if user.suspended:
+            flash("You are currently suspended login into system, please contact your admin.", "danger")    
+        elif user and check_password_hash(user.password_hash, password):
             login_user(user)
             #return redirect(url_for("dashboard"))
             return redirect(url_for("home"))
@@ -319,15 +408,15 @@ def logout():
     flash("You have been logged out successfully.", "info")
     return redirect(url_for("login"))
 
-from flask_login import LoginManager
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Users.query.get(int(user_id))
-
+    #return Users.query.get(int(user_id))
+    return db.session.get(Users, int(user_id))
+    
 @app.route("/home", methods=["GET", "POST"])
 @login_required
 def home():
@@ -462,10 +551,11 @@ def populate_warehouses_with_active_outlets(created_outlets):
 
 
 def retrieve_offline_users():
-  users = Users.query.all()  # returns list of User objects
-  usernames = [u.staff_name for u in users]  # extract usernames
+  #users = Users.query.all()  # returns list of User objects
+  #usernames = [u.staff_name for u in users]  # extract usernames
   #print("DEBUG: usernames =", usernames)
-  return usernames
+  #return usernames
+  return Users.query.all()
 
 def add_purchase(warehouse_id, crates, description=""):
     txn = WarehouseTransaction(
@@ -501,10 +591,15 @@ def record_transaction(transaction_type):
     # FIX: properly unpack both id and name
     outlets = [(outlet_id, outlet_name) for outlet_id, outlet_name in retrieve_outlets()]
     #outlets = [name for name, name in retrieve_outlets()]
-    users = retrieve_offline_users()
+    users_droplist = retrieve_offline_users() # to be used in users droplist
+    users= [u.staff_name for u in users_droplist]  # extract usernames
     staff_name = current_user.staff_name
     last_end_day = get_last_end_day_date()
-
+    if not current_user.feed_entries:
+        flash("System currently using this process,Please try again later.", "danger")
+        #return redirect(request.url)
+        return redirect(url_for("home"))
+    
     each_outlet_disp_collction_summ = []
     for outlet_id, outlet_name in outlets:
 
@@ -524,7 +619,7 @@ def record_transaction(transaction_type):
             "dispatched": dispatched,
             "collected": collected
         })
-    print(each_outlet_disp_collction_summ)
+    #print(each_outlet_disp_collction_summ)
 
 
     if request.method == "POST":
@@ -826,172 +921,6 @@ def collections_dispatch():
         outlet_summ=each_outlet_disp_collction_summ
     )
 
-
-@app.route("/not_unified_dispatch", methods=["GET", "POST"])
-@login_required
-def record_dispatch_not_unfied():
-    db.create_all()
-
-    # Step 1: Fetch branch names and users
-    outlets = [name for name, name in retrieve_outlets()]
-    users = retrieve_offline_users()
-
-    if request.method == "POST":
-        if request.form.get("cancelled") == "true":
-            flash("Submission cancelled by user.", "warning")
-            return redirect(request.url)
-
-        branchname = request.form.get("outlet_name")
-        outlet_t = Outlet.query.filter_by(name=branchname).first()
-        warehouse_id = outlet_t.outlet_id if outlet_t else None
-
-        try:
-            good_crates = int(request.form.get("crates_sent"))
-        except (TypeError, ValueError):
-            good_crates = 0
-
-        #staff_name = request.form.get("staff_name") or ""
-        staff_name = current_user.staff_name  
-        if good_crates <= 0 or not staff_name:
-            flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
-            return redirect(request.url)
-
-        # Define what makes a record "duplicate"
-        #existing_query = db.session.query(WarehouseTransaction).filter_by(
-        #    wrhse_outlet_id=warehouse_id,
-        #    good_crates=good_crates,
-        #    worn_crates=0,
-        #    disposed_crates=0,
-        #    transaction_type="dispatch",
-        #    notes=branchname,
-        #    #staff_name=staff_name
-        #).first()
-
-        last_end_day = get_last_end_day_date()
-        # Build the query
-        query = db.session.query(WarehouseTransaction).filter_by(
-            wrhse_outlet_id=warehouse_id,
-            good_crates=good_crates,
-            worn_crates=0,
-            disposed_crates=0,
-            transaction_type="dispatch",
-            notes=branchname,
-            staff_name=staff_name
-        )
-
-        # Apply cutoff if needed
-        if last_end_day:
-            query = query.filter(WarehouseTransaction.timestamp > last_end_day)
-
-        # Execute
-        existing = query.first()
-
-        if existing:
-            # Duplicate found – discard and alert user
-            flash("⚠️ Duplicate dispatch record detected. Transaction discarded.", "warning")
-            return redirect(request.url)
-
-        new_warehouse_rcrd = WarehouseTransaction(
-            wrhse_outlet_id=warehouse_id,
-            good_crates=good_crates,
-            worn_crates=0,
-            disposed_crates=0,
-            transaction_type="dispatch",
-            notes=branchname,
-            staff_name=staff_name
-        )
-       
-        db.session.add(new_warehouse_rcrd)
-        db.session.commit()
-
-        flash(f"Dispatch recorded: {good_crates} crates sent to {branchname} by {staff_name}.", "success")
-        return redirect(url_for("dashboard"))
-
-    # Step 2: Render template, passing outlets and users
-    return render_template("dispatch.html", outlets=outlets, users=users)
-
-@app.route("/not_unified_collection", methods=["GET", "POST"])
-@login_required
-def record_collection_not_unfied():
-    db.create_all()
-
-    outlets = [name for name, name in retrieve_outlets()]
-    users = retrieve_offline_users()
-
-    if request.method == "POST":
-        if request.form.get("cancelled") == "true":
-            flash("Submission cancelled by user.", "warning")
-            return redirect(request.url)
-
-        branchname = request.form.get("outlet_name")
-        outlet_t = Outlet.query.filter_by(name=branchname).first()
-        warehouse_id = outlet_t.outlet_id if outlet_t else None
-
-        try:
-            good_crates = int(request.form.get("crates_collected"))
-        except (TypeError, ValueError):
-            good_crates = 0
-
-        #staff_name = request.form.get("staff_name") or ""
-        staff_name = current_user.staff_name  
-        if good_crates <= 0 or not staff_name:
-            flash("Invalid submission: crates must be > 0 and staff name required.", "danger")
-            return redirect(request.url)
-
-        # Define what makes a record "duplicate"
-        #existing = db.session.query(WarehouseTransaction).filter_by(
-        #    wrhse_outlet_id=warehouse_id,
-        #    good_crates=good_crates,
-        #    worn_crates=0,
-        #    disposed_crates=0,
-        #    transaction_type="collection",
-        #    notes=branchname,
-        #    #staff_name=staff_name
-        #).first()
-
-        last_end_day = get_last_end_day_date()
-        # Build the query
-        query = db.session.query(WarehouseTransaction).filter_by(
-            wrhse_outlet_id=warehouse_id,
-            good_crates=good_crates,
-            worn_crates=0,
-            disposed_crates=0,
-            transaction_type="collection",
-            notes=branchname,
-            staff_name=staff_name
-        )
-
-        # Apply cutoff if needed
-        if last_end_day:
-            query = query.filter(WarehouseTransaction.timestamp > last_end_day)
-
-        # Execute
-        existing = query.first()
-
-        if existing:
-            # Duplicate found – discard and alert user
-            flash("⚠️ Duplicate collection record detected. Transaction discarded.", "warning")
-            return redirect(request.url)
-        
-        new_warehouse_rcrd = WarehouseTransaction(
-            wrhse_outlet_id=warehouse_id,
-            good_crates=good_crates,
-            worn_crates=0,
-            disposed_crates=0,
-            transaction_type="collection",
-            notes=branchname,
-            staff_name=staff_name
-        )
-        db.session.add(new_warehouse_rcrd)
-        db.session.commit()
-
-        flash(f"Collection recorded: {good_crates} crates returned from {branchname} by {staff_name}.", "success")
-        return redirect(url_for("dashboard"))
-
-    # Render template, passing outlets and users
-    return render_template("collection.html", outlets=outlets, users=users)
-
-
 @app.route("/outlet_grid")
 def outlet_grid():
     return render_template("outlet_grid.html")
@@ -1061,8 +990,8 @@ def get_inventory(outlet_id):
     outlet = outlet_t.name if outlet_t else None
     #warehouse_id = outlet_t.outlet_id if outlet_t else None
 
-    print(outlet_t) 
-    print(outlet)
+    #print(outlet_t) 
+    #print(outlet)
     #from datetime import date
     # Example query: total dispatched + collected for today
 
@@ -1114,7 +1043,7 @@ def get_inventory(outlet_id):
         "thr_recent_dispatch": thr_recent_dispatch,
         "thr_recent_collection": thr_recent_collection
     }
-    print("DEBUG JSON string:", json.dumps(payload, indent=2))
+    #print("DEBUG JSON string:", json.dumps(payload, indent=2))
     return jsonify(payload)
     #return {"dispatched": d, "collected": c, "recorded_by" :sn,"recent_dispatches": thr_lt_d,"recent_collections" :thr_lt_c}
 
@@ -1159,7 +1088,7 @@ def collections_summary(warehouse_id):
      #.filter(WarehouseTransaction.wrhse_outlet_id == warehouse_id)
         .group_by(WarehouseTransaction.staff_name)
     )
-    print(summary_query)
+    #print(summary_query)
 
 
     # Apply cutoff if available
@@ -1167,7 +1096,7 @@ def collections_summary(warehouse_id):
         summary_query = summary_query.filter(WarehouseTransaction.timestamp > last_end_day)
 
     summary = summary_query.all()
-    print(summary)
+    #print(summary)
 
     data = []
     for row in summary:
@@ -1225,7 +1154,7 @@ def collections_summary(warehouse_id):
                 for b in branch_data
             ]
         })
-        print(data)
+        #print(data)
     return jsonify(data)
 
 #@app.route("/reconcile/<int:outlet_id>")
@@ -1342,7 +1271,9 @@ def dashboard():
         "available_pct": round(available_pct, 2)
     }
 
-    users = retrieve_offline_users()
+    #users = retrieve_offline_users()
+    users_droplist = retrieve_offline_users() # to be used in users droplist
+    users = [u.staff_name for u in users_droplist]  # extract usernames
     last_rec = EndDayLog.query.order_by(EndDayLog.created_at.desc()).first()
     reconciliations = EndDayLog.query.order_by(EndDayLog.created_at.desc()).limit(20).all()
 
@@ -1376,7 +1307,7 @@ def dashboard():
       uncollected_yesterday = fd
 
       color = "table-danger" if variance > 0 else "table-success"
-      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{uncollected_yesterday}</td><td>{todays_dispatch}</td><th>{total_dispatched}</th><td>{collected}</td><td class='{color}'>{variance}</td></tr>"
+      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{uncollected_yesterday}</td><td>{todays_dispatch}</td><th>{total_dispatched}</th><td>{collected}</td><td class='{color}'>{variance}</td><td>""</td><td>""</td></tr>"
 
     #print("Warehouse object:", warehouse)
     #print("Warehouse.id:", warehouse.id if warehouse else None)
@@ -1458,12 +1389,12 @@ def get_daily_dispatch_vers_collection(outlet_name):
     today_forced_dispatched_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
         .filter(WarehouseTransaction.notes == outlet_name,
                 WarehouseTransaction.transaction_type == 'dispatch',
-                WarehouseTransaction.staff_name.like('System Auto%'))
+                WarehouseTransaction.staff_name.like('Sys Auto%'))
 
     today_night_shift_dispatch_query = db.session.query(db.func.sum(WarehouseTransaction.good_crates))\
         .filter(WarehouseTransaction.notes == outlet_name,
                 WarehouseTransaction.transaction_type == 'dispatch',
-                WarehouseTransaction.staff_name.notlike('System Auto%'))
+                WarehouseTransaction.staff_name.notlike('Sys Auto%'))
 
     # Apply cutoff if it exists
     if last_end_day:
@@ -2185,6 +2116,8 @@ def manage_users():
         elif action == "update":
             user_id = request.form.get("username")
             new_name = request.form.get("new_name")
+            #print("updating", user_id)
+
             if not new_name:
                 update_message = "New name is required."
             else:
@@ -2192,6 +2125,21 @@ def manage_users():
                 if user:
                     oldname = user.staff_name
                     user.staff_name = new_name
+
+                    # Update privilege checkboxes (True if present, False if not)
+                    user.suspended = bool(request.form.get("suspended"))
+                    user.feed_entries = bool(request.form.get("feed_entries"))
+                    user.amend_entry = bool(request.form.get("amend_entry"))
+                    user.provision1 = bool(request.form.get("provision1"))
+                    user.provision2 = bool(request.form.get("provision2"))
+                    user.provision3 = bool(request.form.get("provision3"))
+                    user.provision4 = bool(request.form.get("provision4"))
+                    user.provision5 = bool(request.form.get("provision5"))
+                    user.provision6 = bool(request.form.get("provision6"))
+                    user.provision7 = bool(request.form.get("provision7"))
+                    user.provision8 = bool(request.form.get("provision8"))
+                    user.provision9 = bool(request.form.get("provision9"))
+
                     db.session.commit()
                     update_message = f"User '{oldname}' updated to '{new_name}' successfully!"
                 else:
@@ -2208,6 +2156,7 @@ def manage_users():
                 delete_message = "User not found."
 
     users = Users.query.all()
+    #print(users)
 
     return render_template(
         "manage_users.html",
@@ -2216,6 +2165,32 @@ def manage_users():
         update_message=update_message,
         delete_message=delete_message
     )
+
+@app.route("/get_user_privileges/<int:user_id>")
+def get_user_privileges(user_id):
+    user = Users.query.get(user_id)
+    #print("testing user id",user)
+    if not user:
+        return {"error": "User not found"}, 404
+
+    #print(user.suspended)
+    #print(user.feed_entries)
+    #print(user.provision1)
+    return {
+        "suspended": user.suspended,
+        "feed_entries": user.feed_entries,
+        "amend_entry": user.amend_entry,
+        "provision1": user.provision1,
+        "provision2": user.provision2,
+        "provision3": user.provision3,
+        "provision4": user.provision4,
+        "provision5": user.provision5,
+        "provision6": user.provision6,
+        "provision7": user.provision7,
+        "provision8": user.provision8,
+        "provision9": user.provision9,
+    }
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))  # Render sets PORT

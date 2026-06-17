@@ -352,41 +352,92 @@ function showToast(message, classes) {
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-  // --- Display User Summary ---
-  const displayBtn = document.getElementById("displayuserssummary");
-  if (displayBtn) {
-    displayBtn.addEventListener("click", function() {
-      document.body.style.cursor = "wait";
+  const printBtn = document.getElementById("displayuserssummary");
+  if (printBtn) {
+    printBtn.addEventListener("click", function() {
+      // Refresh the report content before printing
       fetch("/end_of_summary_print_matrix")
         .then(res => res.text())
         .then(html => {
           const container = document.getElementById("collections_summary");
           container.innerHTML = html;
+
+          // Trigger print after injecting
+          //window.print();
         })
         .catch(err => {
           console.error("Error fetching summary matrix:", err);
           showToast("Failed to load summary matrix.", "bg-danger text-white");
-        })
-        .finally(() => {
-          document.body.style.cursor = "default";
         });
     });
   }
+});
+</script>
 
-  // --- End of Day Closure ---
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const closureBtn = document.getElementById("delete_openClosureReport");
+  if (closureBtn) {
+    closureBtn.addEventListener("click", function() {
+      // Get the date from the input field
+      const dateInput = document.getElementById("summaryDate");
+      const closureDate = dateInput ? dateInput.value : "";
+
+      // Open the standalone closure report page
+      // Backend route should render the full matrix with header/footer
+      const url = "/end_of_day_closure/" + encodeURIComponent(closureDate || "today");
+      window.open(url, "_blank", "noopener,noreferrer");
+    });
+  }
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const closureBtn = document.getElementById("delete_openClosureReport");
+  if (closureBtn) {
+    closureBtn.addEventListener("click", function() {
+      const dateInput = document.getElementById("summaryDate");
+      const closureDate = dateInput ? dateInput.value : "";
+
+      // Build URL safely
+      const url = "/end_of_day_closure/" + encodeURIComponent(closureDate || "today");
+
+      // Open in new tab with proper features
+      window.open(url, "_blank", "width=1200,height=800,scrollbars=yes,resizable=yes");
+    });
+  }
+});
+
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // --- End of Day Closure button ---
   const closureBtn = document.getElementById("openClosureReport");
   if (closureBtn) {
     closureBtn.addEventListener("click", function(e) {
       e.preventDefault();
-      closureBtn.disabled = true;
+
+      // Show busy cursor immediately
       document.body.style.cursor = "wait";
+
+      // Debounce: disable briefly to prevent multiple rapid clicks
+      closureBtn.disabled = true;
 
       const dateInput = document.getElementById("summaryDate");
       const closureDate = dateInput ? dateInput.value : "";
       const url = "/end_of_day_closure/" + encodeURIComponent(closureDate || "today");
 
+      // Open in new tab
+      //window.open(url, "_blank", "width=1200,height=800,scrollbars=yes,resizable=yes");
+     // Open in a new tab (not a popup window)
       window.open(url, "_blank");
 
+      // Reset cursor and re-enable after short delay
       setTimeout(() => {
         document.body.style.cursor = "default";
         closureBtn.disabled = false;
@@ -394,70 +445,135 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  // --- Lens Icon (Collections Summary) ---
+  // --- Modal close button stabilization ---
+  const collectionsModalEl = document.getElementById('collectionsModal');
+  if (collectionsModalEl) {
+    collectionsModalEl.addEventListener('hide.bs.modal', () => {
+      // Show busy cursor while closing
+      document.body.style.cursor = "wait";
+    });
+    collectionsModalEl.addEventListener('hidden.bs.modal', () => {
+      // Reset cursor after modal is fully closed
+      document.body.style.cursor = "default";
+    });
+  }
+});
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Lens button: show collapsible summary
   const viewBtn = document.getElementById("viewCollectionsBtn");
   if (viewBtn) {
     viewBtn.addEventListener("click", function() {
-      const modalEl = document.getElementById("collectionsModal"); // or endDayModal if that's your actual modal
-      const modal = new bootstrap.Modal(modalEl);
-      modal.show();
-
-      document.body.style.cursor = "wait";
+      const collectionsModalEl = document.getElementById("collectionsModal");
+      const collectionsModal = new bootstrap.Modal(collectionsModalEl);
+      collectionsModal.show();
 
       fetch("/warehouse/{{ warehouse.id if warehouse else 0 }}/collections_summary")
         .then(res => res.json())
         .then(data => {
           const container = document.getElementById("collections_summary");
           container.innerHTML = "";
+
           data.forEach((user, idx) => {
             const collapseId = "collapse-" + idx;
             container.innerHTML += `
               <div class="card my-2">
-                <div class="card-header" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                  ${user.user} — Collections: ${user.total_collections} | Dispatches: ${user.total_dispatches} | Variance: ${user.total_variances}
+                <div class="card-header" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                  ${user.user} — Total Collections: ${user.total_collections} | Total Dispatches: ${user.total_dispatches} | Total Variance: ${user.total_variances}
                 </div>
                 <div id="${collapseId}" class="collapse">
                   <div class="card-body p-0">
-                    <!-- table markup -->
+                    <table class="table table-sm table-striped mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Branch</th>
+                          <th>Dispatches</th>
+                          <th>Collections</th>
+                          <th>Variances</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${user.branches.map(b => `
+                          <tr>
+                            <td>${b.branch}</td>
+                            <td>${b.dispatches}</td>
+                            <td>${b.collections}</td>
+                            <td>${b.variances}</td>
+                          </tr>
+                        `).join("")}
+                      </tbody>
+                      <tfoot>
+                        <tr class="fw-bold">
+                          <td>Total</td>
+                          <td>${user.total_dispatches}</td>
+                          <td>${user.total_collections}</td>
+                          <td>${user.total_variances}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
-              </div>`;
+              </div>
+            `;
           });
         })
         .catch(err => {
           console.error("Error fetching collections summary:", err);
           showToast("Failed to load collections summary.", "bg-danger text-white");
-        })
-        .finally(() => {
-          document.body.style.cursor = "default";
         });
     });
   }
+});
+</script>
 
-  // --- Print Report ---
-  const printReportBtn = document.getElementById("printReportBtn");
-  if (printReportBtn) {
-    printReportBtn.addEventListener("click", function() {
-      document.body.style.cursor = "wait";
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const printBtn = document.getElementById("printReportBtn");
+  if (printBtn) {
+    printBtn.addEventListener("click", function() {
+      // Fetch the matrix HTML
       fetch("/end_of_summary_print_matrix")
         .then(res => res.text())
         .then(html => {
+          // Open a new window with just the matrix content
           const printWindow = window.open('', '', 'width=1200,height=800');
-          printWindow.document.write(html);
-          printWindow.document.close();
-          printWindow.print();
+          printWindow.document.write(`
+            <html>
+              <head>
+                <title>Outlet Matrix Report</title>
+                <style>
+                  @page { size: landscape; margin: 1cm; }
+                  body { font-family: Arial, sans-serif; }
+                  table { width: 100%; border-collapse: collapse; }
+                  th, td { border: 1px solid #000; padding: 4px; text-align: right; }
+                  thead { display: table-header-group; }
+                  tfoot { display: table-footer-group; }
+                </style>
+              </head>
+              <body>
+                ${html}
+              </body>
+            </html>
+          `);
+          //printWindow.document.close();
+         // printWindow.focus();
+          // ✅ Trigger the print dialog
+         // printWindow.print();
         })
         .catch(err => {
           console.error("Error fetching matrix:", err);
           showToast("Failed to load matrix for printing.", "bg-danger text-white");
-        })
-        .finally(() => {
-          document.body.style.cursor = "default";
         });
     });
   }
+});
+</script>
 
-  // --- Variance Calculation ---
+<script>
+document.addEventListener("DOMContentLoaded", function() {
   const physicalInput = document.getElementById("physical_crates");
   const appInput = document.getElementById("app_collections");
   const varianceInput = document.getElementById("variance");
@@ -466,6 +582,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const physical = parseInt(physicalInput.value) || 0;
     const app = parseInt(appInput.value) || 0;
     const variance = physical - app;
+
     varianceInput.value = variance;
 
     if (variance < 0) {
@@ -477,10 +594,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   }
 
-  if (physicalInput && appInput && varianceInput) {
-    physicalInput.addEventListener("input", updateVariance);
-    updateVariance();
-  }
+  physicalInput.addEventListener("input", updateVariance);
+  updateVariance();
 });
 </script>
 

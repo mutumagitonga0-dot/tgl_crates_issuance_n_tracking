@@ -160,18 +160,6 @@
         </button>
       </div>
 
-      
-
-<!-- Print collection entries Button -->
-<div class="col">
-  <button class="btn btn-primary w-100"
-          style="background-color:#070118; border-color:#8B0000;"
-          id="printCollectionBtn">
-    Print To Collect List
-  </button>
-</div>
-
-
 <!-- Collapsible Reconciliation Panel -->
 <div class="collapse mt-4" id="reconciliationPanel">
   <div class="card card-body">
@@ -252,29 +240,10 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 
-
-
-<div id="printCollectionArea">
   <table class="table table-bordered">
-    <thead><tr><th>Outlet</th><th>Recurrent Balance</th><th>Uncollected Yesterday</th><th>Today's Dispatch</th><th>Total Dispatched</th><th>Today Collected</th><th>Today Variance</th><th>Picked</th><th>Left</th></tr></thead>
-    <tbody>
-{{ rows|safe }}
-</tbody>
-<tfoot>
-      <tr class="fw-bold">
-        <td>Totals</td>
-        <td>{{ reconciliations.recurrent_balance }}</td>
-        <td>{{ reconciliations.uncollected_yesterday }}</td>
-        <td>{{ reconciliations.todays_dispatch }}</td>
-        <td>{{ reconciliations.total_dispatched }}</td>
-        <td>{{ reconciliations.today_collected }}</td>
-        <td>{{ reconciliations.today_variance }}</td>
-        <td></td> <!-- Picked stays blank -->
-        <td></td> <!-- Left stays blank -->
-      </tr>
-    </tfoot>
+    <thead><tr><th>Outlet</th><th>Recurrent Balance</th><th>Uncollected Yesterday</th><th>Today's Dispatch</th><th>Total Dispatched</th><th>Today Collected</th><th>Today Variance</th></tr></thead>
+    <tbody>{{ rows|safe }}</tbody>
   </table>
-</div>
 
 <div id="errorPanel" class="alert alert-danger d-none"></div>
 
@@ -319,82 +288,6 @@ document.getElementById("toggle-history").addEventListener("click", function() {
     new bootstrap.Collapse(historyPanel, {toggle: true});
     latestTable.style.display = "none";
     this.textContent = "Hide History";
-  }
-});
-</script>
-
-
-
-
-<style>
-/* Print rules */
-@media print {
-  @page {
-    size: A4 potrait;   /* fixed width */
-    margin: 1cm;         /* adjust margins */
-  }
-  body {
-    font-family: Arial, sans-serif;
-    font-size: 12px;
-  }
-  table {
-    width: 100%;         /* fit width */
-    border-collapse: collapse;
-  }
-  th, td {
-    border: 1px solid #000;
-    padding: 4px;
-    text-align: center;
-  }
-  thead {
-    display: table-header-group; /* repeat header on each page */
-  }
-  tfoot {
-    display: table-footer-group;
-  }
-}
-</style>
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  const cells = document.querySelectorAll("#printCollectionArea td");
-  cells.forEach(cell => {
-    if (cell.textContent.trim() === "0") {
-      cell.textContent = "-";
-    }
-  });
-});
-</script>
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  const printBtn = document.getElementById("printCollectionBtn");
-  if (printBtn) {
-    printBtn.addEventListener("click", function() {
-      // Open a new window with just the table content
-      const content = document.getElementById("printCollectionArea").innerHTML;
-      const printWindow = window.open('', '', 'width=1200,height=600');
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Collection List</title>
-            <style>
-              @page { size: A4 potrait; margin: 1cm; }
-              body { font-family: Arial, sans-serif; font-size: 12px; }
-              table { width: 100%; border-collapse: collapse; }
-              th, td { border: 1px solid #000; padding: 4px; text-align: center; }
-              thead { display: table-header-group; }
-              tfoot { display: table-footer-group; }
-            </style>
-          </head>
-          <body>
-            ${content}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    });
   }
 });
 </script>

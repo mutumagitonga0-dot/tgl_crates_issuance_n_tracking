@@ -270,7 +270,7 @@ function populateRecent(data, type) {
   }
 
   records.slice(0, 3).forEach(r => {
-    const rowClass = r.staff_name && r.staff_name.startsWith("System Auto")
+    const rowClass = r.staff_name && r.staff_name.startsWith("Sys Auto")
       ? "table-danger" : "table-success";
     const row = `<tr class="${rowClass}">
         <td>${r.timestamp}</td>
@@ -289,7 +289,7 @@ function populateDispatches(data) {
   if (!dispatchTbody) return; // guard against null
   dispatchTbody.innerHTML = "";
   (data.thr_recent_dispatch || []).slice(0, 3).forEach(d => {
-    const rowClass = d.staff_name && d.staff_name.startsWith("System Auto")
+    const rowClass = d.staff_name && d.staff_name.startsWith("Sys Auto")
       ? "table-danger" : "table-success";
     const row = `<tr class="${rowClass}">
         <td>${d.timestamp}</td>
@@ -307,7 +307,7 @@ function populateCollections(data) {
   if (!collectionTbody) return; // guard against null
   collectionTbody.innerHTML = "";
   (data.thr_recent_collection || []).slice(0, 3).forEach(c => {
-    const rowClass = c.staff_name && c.staff_name.startsWith("System Auto")
+    const rowClass = c.staff_name && c.staff_name.startsWith("Sys Auto")
       ? "table-danger" : "table-success";
     const row = `<tr class="${rowClass}">
         <td>${c.timestamp}</td>
