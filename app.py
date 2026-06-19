@@ -1306,8 +1306,10 @@ def dashboard():
       todays_dispatch = nd
       uncollected_yesterday = fd
 
-      color = "table-danger" if variance > 0 else "table-success"
-      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{uncollected_yesterday}</td><td>{todays_dispatch}</td><th>{total_dispatched}</th><td>{collected}</td><td class='{color}'>{variance}</td><td>""</td><td>""</td></tr>"
+      #color = "table-danger" if variance > 0 else "table-success"
+      color = "table-danger" if total_dispatched > 0 else "table-success"
+      #rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{uncollected_yesterday}</td><td>{todays_dispatch}</td><th>{total_dispatched}</th><td>{collected}</td><td class='{color}'>{variance}</td><td>""</td><td>""</td></tr>"
+      rows += f"<tr><td>{outlet_name}</td><td>{recurrent_balance}</td><td>{uncollected_yesterday}</td><td>{todays_dispatch}</td><td class='{color}'>{total_dispatched}</td><td></td><td>{collected}</td><td>""</td><td>""</td></tr>"
 
     #print("Warehouse object:", warehouse)
     #print("Warehouse.id:", warehouse.id if warehouse else None)
@@ -1449,6 +1451,7 @@ def get_daily_dispatch_vers_collection(outlet_name):
 
     recurrent_balance = recurrent_dispatched - recurrent_collected
     variance = dispatched - collected
+    
 
     # Build user collections summary
     user_collections_summary = {
