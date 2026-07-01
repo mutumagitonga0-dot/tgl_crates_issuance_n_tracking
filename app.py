@@ -2118,7 +2118,12 @@ def manage_users():
 
         elif action == "update":
             user_id = request.form.get("username")
-            new_name = request.form.get("new_name")
+            #new_name =request.form.get("new_name")
+            selected_user = Users.query.get(user_id)
+            if selected_user:
+                oldname = selected_user.staff_name
+                ##user.staff_name = new_name
+            new_name = request.form.get("new_name") or oldname
             #print("updating", user_id)
 
             if not new_name:
@@ -2144,7 +2149,11 @@ def manage_users():
                     user.provision9 = bool(request.form.get("provision9"))
 
                     db.session.commit()
-                    update_message = f"User '{oldname}' updated to '{new_name}' successfully!"
+                    update_message = (
+                        f"User '{oldname}' updated successfully!"
+                        if oldname == new_name
+                        else f"User '{oldname}' updated to '{new_name}' successfully!"
+                    )
                 else:
                     update_message = "User not found."
 

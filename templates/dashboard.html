@@ -274,6 +274,19 @@ document.addEventListener('DOMContentLoaded', function () {
         <td></td> <!-- Left stays blank -->
       </tr>
     </tfoot>
+<tfoot>
+      <tr class="fw-bold">
+        <td>Recorded by</td>
+        <td>{{ reconciliations.recurrent_balance }}</td>
+        <td>{{ reconciliations.uncollected_yesterday }}</td>
+        <td>{{ reconciliations.todays_dispatch }}</td>
+        <td>{{ reconciliations.total_dispatched }}</td>
+        <td>{{ reconciliations.today_collected }}</td>
+        <td>{{ reconciliations.today_variance }}</td>
+        <td></td> <!-- Picked stays blank -->
+        <td></td> <!-- Left stays blank -->
+      </tr>
+    </tfoot>
   </table>
 </div>
 
