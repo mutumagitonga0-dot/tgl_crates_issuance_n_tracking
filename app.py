@@ -1366,7 +1366,117 @@ def get_user_collections_summary():
     summaries = get_all_outlets_collections_summary()
     return jsonify(summaries)
 
+
 def get_daily_dispatch_vers_collection(outlet_name):
+    """
+    Calculate collected and dispatched crates for a given outlet
+    since the last end day cutoff, plus recent records.
+    Optimized to reduce multiple queries into one aggregate.
+    """
+    last_end_day = get_last_end_day_date()
+
+    # Aggregate totals in one query
+    totals = db.session.query(
+        db.func.sum(
+            case((WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates))
+        ).label("collected"),
+        db.func.sum(
+            case((WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates))
+        ).label("dispatched"),
+        db.func.sum(
+            case(
+                (WarehouseTransaction.transaction_type == 'dispatch') &
+                (WarehouseTransaction.staff_name.like('Sys Auto%'), WarehouseTransaction.good_crates)
+            )
+        ).label("forced"),
+        db.func.sum(
+            case(
+                (WarehouseTransaction.transaction_type == 'dispatch') &
+                (WarehouseTransaction.staff_name.notlike('Sys Auto%'), WarehouseTransaction.good_crates)
+            )
+        ).label("night")
+    ).filter(WarehouseTransaction.notes == outlet_name)
+
+    if last_end_day:
+        totals = totals.filter(WarehouseTransaction.timestamp > last_end_day)
+
+    totals = totals.first()
+    collected = totals.collected or 0
+    dispatched = totals.dispatched or 0
+    night_forced = totals.forced or 0
+    night_dispatch = totals.night or 0
+
+    # Recent dispatches and collections (limit 3 each, only needed fields)
+    thr_recent_dispatch = db.session.query(
+        WarehouseTransaction.timestamp,
+        WarehouseTransaction.good_crates,
+        WarehouseTransaction.staff_name
+    ).filter(
+        WarehouseTransaction.notes == outlet_name,
+        WarehouseTransaction.transaction_type == 'dispatch',
+        WarehouseTransaction.timestamp > last_end_day if last_end_day else True
+    ).order_by(WarehouseTransaction.timestamp.desc()).limit(3).all()
+
+    thr_recent_collection = db.session.query(
+        WarehouseTransaction.timestamp,
+        WarehouseTransaction.good_crates,
+        WarehouseTransaction.staff_name
+    ).filter(
+        WarehouseTransaction.notes == outlet_name,
+        WarehouseTransaction.transaction_type == 'collection',
+        WarehouseTransaction.timestamp > last_end_day if last_end_day else True
+    ).order_by(WarehouseTransaction.timestamp.desc()).limit(3).all()
+
+    thr_recent_dispatch = [serialize_txn(txn) for txn in thr_recent_dispatch]
+    thr_recent_collection = [serialize_txn(txn) for txn in thr_recent_collection]
+
+    # Last staff
+    last_staff = db.session.query(WarehouseTransaction.staff_name).filter(
+        WarehouseTransaction.notes == outlet_name,
+        WarehouseTransaction.transaction_type.in_(["collection", "dispatch"])
+    ).order_by(WarehouseTransaction.timestamp.desc()).first()
+    last_staff = last_staff[0] if last_staff else None
+
+    # Recurrent totals
+    recurrent_collected = db.session.query(db.func.sum(WarehouseTransaction.good_crates)).filter(
+        WarehouseTransaction.notes == outlet_name,
+        WarehouseTransaction.transaction_type == 'collection'
+    ).scalar() or 0
+
+    recurrent_dispatched = db.session.query(db.func.sum(WarehouseTransaction.good_crates)).filter(
+        WarehouseTransaction.notes == outlet_name,
+        WarehouseTransaction.transaction_type == 'dispatch'
+    ).scalar() or 0
+
+    outlet_id = db.session.query(db.func.max(WarehouseTransaction.wrhse_outlet_id)).filter(
+        WarehouseTransaction.notes == outlet_name
+    ).scalar() or 0
+
+    recurrent_balance = recurrent_dispatched - recurrent_collected
+    variance = dispatched - collected
+
+    user_collections_summary = {
+        "user": last_staff,
+        "total": collected,
+        "collections": thr_recent_collection
+    }
+
+    return (
+        dispatched,
+        collected,
+        recurrent_balance,
+        variance,
+        outlet_id,
+        last_staff,
+        night_forced,
+        night_dispatch,
+        thr_recent_dispatch,
+        thr_recent_collection,
+        user_collections_summary
+    )
+
+
+def correct_but_heavy_get_daily_dispatch_vers_collection(outlet_name):
     """
     Calculate collected and dispatched crates for a given outlet
     since the last end day cutoff, plus recent records.
