@@ -4,7 +4,7 @@ from flask import Flask,Response, request, render_template_string, redirect, url
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy 
-from sqlalchemy import create_engine, text,cast,Date,func,case
+from sqlalchemy import create_engine, text,cast,Date,func,case,and_
 from flask_migrate import Migrate
 #import uui
 from reportlab.lib.pagesizes import A4
@@ -1375,27 +1375,35 @@ def get_daily_dispatch_vers_collection(outlet_name):
     """
     last_end_day = get_last_end_day_date()
 
-    # Aggregate totals in one query
     totals = db.session.query(
         db.func.sum(
-            case((WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates))
+            case(
+                (WarehouseTransaction.transaction_type == 'collection', WarehouseTransaction.good_crates)
+            )
         ).label("collected"),
         db.func.sum(
-            case((WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates))
+            case(
+                (WarehouseTransaction.transaction_type == 'dispatch', WarehouseTransaction.good_crates)
+            )
         ).label("dispatched"),
         db.func.sum(
             case(
-                (WarehouseTransaction.transaction_type == 'dispatch') &
-                (WarehouseTransaction.staff_name.like('Sys Auto%'), WarehouseTransaction.good_crates)
+                (and_(
+                    WarehouseTransaction.transaction_type == 'dispatch',
+                    WarehouseTransaction.staff_name.like('Sys Auto%')
+                ), WarehouseTransaction.good_crates)
             )
         ).label("forced"),
         db.func.sum(
             case(
-                (WarehouseTransaction.transaction_type == 'dispatch') &
-                (WarehouseTransaction.staff_name.notlike('Sys Auto%'), WarehouseTransaction.good_crates)
+                (and_(
+                    WarehouseTransaction.transaction_type == 'dispatch',
+                    WarehouseTransaction.staff_name.notlike('Sys Auto%')
+                ), WarehouseTransaction.good_crates)
             )
         ).label("night")
     ).filter(WarehouseTransaction.notes == outlet_name)
+
 
     if last_end_day:
         totals = totals.filter(WarehouseTransaction.timestamp > last_end_day)
