@@ -2238,8 +2238,8 @@ def manage_users():
                     staff_name=name,
                     username=name,  # you can adjust if you want username separate
                     password_hash=hashed_pw,
-                    status=True,
-                    suspended=False
+                    status=1,
+                    suspended=0
                 )
                 db.session.add(new_user)
                 db.session.commit()
