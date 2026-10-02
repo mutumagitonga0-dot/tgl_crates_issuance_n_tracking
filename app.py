@@ -381,6 +381,15 @@ def login():
         user = Users.query.filter_by(username=username).first()
         
         print(user)
+
+        # 1. Check if the user actually exists in the database
+        if user is None:
+            return "Invalid username or password"  # Or flash a message / redirect
+
+        # 2. Safely check if the user is suspended now that we know they exist
+        #if user.suspended:
+        #    return "Your account has been suspended."
+
         #print(user.suspended)
         # Update Admin user
         #success = update_user_password("tempuser", "changeme")
@@ -2228,7 +2237,8 @@ def manage_users():
                     staff_name=name,
                     username=name,  # you can adjust if you want username separate
                     password_hash=hashed_pw,
-                    status=1
+                    status=1,
+                    suspended=False
                 )
                 db.session.add(new_user)
                 db.session.commit()
