@@ -375,7 +375,8 @@ def update_user_password(username: str, plain_password: str) -> bool:
 def login():
     if request.method == "POST":
         #username = request.form["username"]
-        username = request.form["username"].lower()
+        #username = request.form["username"].lower()
+        username= request.form["username"].upper()
         password = request.form["password"]
         print(username,password)
         user = Users.query.filter_by(username=username).first()
@@ -2223,7 +2224,7 @@ def manage_users():
         action = request.form.get("action")
 
         if action == "create":
-            name = request.form.get("name")
+            name = request.form.get("name").upper()
             plain_password = request.form.get("password")  # new field from form
             existing_user = Users.query.filter_by(staff_name=name).first()
 
@@ -2251,7 +2252,7 @@ def manage_users():
             if selected_user:
                 oldname = selected_user.staff_name
                 ##user.staff_name = new_name
-            new_name = request.form.get("new_name") or oldname
+            new_name = request.form.get("new_name").upper() or oldname
             #print("updating", user_id)
 
             if not new_name:
