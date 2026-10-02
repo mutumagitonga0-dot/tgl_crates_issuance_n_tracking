@@ -2238,7 +2238,7 @@ def manage_users():
                     staff_name=name,
                     username=name,  # you can adjust if you want username separate
                     password_hash=hashed_pw,
-                    status=1,
+                    status=True,
                     suspended=False
                 )
                 db.session.add(new_user)
